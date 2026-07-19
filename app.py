@@ -6,19 +6,29 @@ from modulos.database import (
 )
 
 from modulos.generar_kml import generar_kml
+from modulos.utilidades import crear_carpetas
 
+
+# =====================================================
+# MENÚ
+# =====================================================
 
 def mostrar_menu():
+
     print("\n" + "=" * 60)
-    print("           S I F O")
+    print("            S I F O")
     print("Sistema Inteligente para Incendios Forestales")
     print("=" * 60)
-    print("1 - Registrar Incendio")
-    print("2 - Listar Incendios")
-    print("3 - Generar KML")
+    print("1 - Registrar incendio")
+    print("2 - Listar incendios")
+    print("3 - Generar mapa KML")
     print("4 - Salir")
     print("=" * 60)
 
+
+# =====================================================
+# REGISTRAR
+# =====================================================
 
 def opcion_registrar():
 
@@ -35,7 +45,7 @@ def opcion_registrar():
         latitud = float(input("Latitud: "))
         longitud = float(input("Longitud: "))
     except ValueError:
-        print("\nError: La latitud y longitud deben ser numéricas.")
+        print("\nLas coordenadas no son válidas.")
         return
 
     descripcion = input("Descripción: ")
@@ -54,16 +64,21 @@ def opcion_registrar():
     print("\n✅ Incendio registrado correctamente.")
 
 
+# =====================================================
+# LISTAR
+# =====================================================
+
 def opcion_listar():
 
     incendios = listar_incendios()
 
     if len(incendios) == 0:
+
         print("\nNo existen incendios registrados.")
         return
 
     print("\nLISTADO DE INCENDIOS")
-    print("=" * 60)
+    print("=" * 70)
 
     for incendio in incendios:
 
@@ -77,15 +92,20 @@ def opcion_listar():
         print(f"Longitud: {incendio[7]}")
         print(f"Descripción: {incendio[8]}")
         print(f"Estado: {incendio[9]}")
-        print(f"Radio análisis: {incendio[10]} metros")
-        print("-" * 60)
+        print(f"Radio de análisis: {incendio[10]} m")
+        print("-" * 70)
 
+
+# =====================================================
+# GENERAR KML
+# =====================================================
 
 def opcion_generar_kml():
 
     incendios = obtener_incendios()
 
     if len(incendios) == 0:
+
         print("\nNo existen incendios registrados.")
         return
 
@@ -93,20 +113,33 @@ def opcion_generar_kml():
     print("=" * 60)
 
     for incendio in incendios:
-        print(f"{incendio[0]} - {incendio[1]} ({incendio[2]})")
 
-    print()
+        print(
+            f"{incendio[0]} - {incendio[1]} | "
+            f"{incendio[2]} | {incendio[3]}"
+        )
 
     try:
-        id_incendio = int(input("Seleccione el ID del incendio: "))
+
+        id_incendio = int(
+            input("\nSeleccione el ID del incendio: ")
+        )
+
     except ValueError:
+
         print("ID inválido.")
         return
 
     generar_kml(id_incendio)
 
 
+# =====================================================
+# MAIN
+# =====================================================
+
 def main():
+
+    crear_carpetas()
 
     crear_base_datos()
 
@@ -137,6 +170,10 @@ def main():
 
             print("\nOpción incorrecta.")
 
+
+# =====================================================
+# INICIO
+# =====================================================
 
 if __name__ == "__main__":
     main()

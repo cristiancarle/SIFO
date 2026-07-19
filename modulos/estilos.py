@@ -1,46 +1,42 @@
 import simplekml
+from config import ICONO_INCENDIO
 
 
 def estilo_incendio():
 
-    estilo = simplekml.Style()
+    s = simplekml.Style()
 
-    estilo.iconstyle.icon.href = \
-        "http://maps.google.com/mapfiles/kml/shapes/firedept.png"
+    s.iconstyle.icon.href = ICONO_INCENDIO
+    s.iconstyle.scale = 1.4
 
-    estilo.iconstyle.scale = 1.5
-
-    return estilo
+    return s
 
 
 def estilo_ruta():
 
-    estilo = simplekml.Style()
+    s = simplekml.Style()
 
-    estilo.linestyle.color = simplekml.Color.red
+    s.linestyle.width = 4
+    s.linestyle.color = simplekml.Color.red
 
-    estilo.linestyle.width = 4
-
-    return estilo
+    return s
 
 
 def estilo_camino():
 
-    estilo = simplekml.Style()
+    s = simplekml.Style()
 
-    estilo.linestyle.color = simplekml.Color.orange
+    s.linestyle.width = 2
+    s.linestyle.color = simplekml.Color.orange
 
-    estilo.linestyle.width = 2
-
-    return estilo
+    return s
 
 
 def estilo_sendero():
 
-    estilo = simplekml.Style()
+    s = simplekml.Style()
 
-    estilo.linestyle.color = simplekml.Color.gray
+    s.linestyle.width = 1
+    s.linestyle.color = simplekml.Color.gray
 
-    estilo.linestyle.width = 1
-
-    return estilo
+    return s
