@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2" xmlns:gx="http://www.google.com/kml/ext/2.2">
+    <Document id="1">
+        <Style id="4">
+            <IconStyle id="5">
+                <colorMode>normal</colorMode>
+                <scale>1</scale>
+                <heading>0</heading>
+                <Icon id="6">
+                    <href>http://maps.google.com/mapfiles/kml/shapes/firedept.png</href>
+                </Icon>
+            </IconStyle>
+        </Style>
+        <Placemark id="3">
+            <name>Salta</name>
+            <description>Cerca de capitañ</description>
+            <styleUrl>#4</styleUrl>
+            <Point id="2">
+                <coordinates>-65.60647,-24.95675,0.0</coordinates>
+            </Point>
+        </Placemark>
+    </Document>
+</kml>
