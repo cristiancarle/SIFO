@@ -1,59 +1,141 @@
-import simplekml
-import sqlite3
 import os
 
-DB = "datos/incendios.db"
+import simplekml
+
+from config import KML_DIR
+from config import RADIO_ANALISIS
+
+from modulos.database import obtener_incendio_por_id
+from modulos.cartografia import (
+    obtener_red_vial,
+    clasificar_camino
+)
+
+from modulos.estilos import (
+    estilo_incendio,
+    estilo_ruta,
+    estilo_camino,
+    estilo_sendero
+)
+
+from modulos.utilidades import escribir_log
 
 
 def generar_kml(id_incendio):
 
-    conexion = sqlite3.connect(DB)
-    cursor = conexion.cursor()
+    incendio = obtener_incendio_por_id(id_incendio)
 
-    cursor.execute("""
-        SELECT
-            nombre_incendio,
-            latitud,
-            longitud,
-            descripcion
-        FROM incendios
-        WHERE id = ?
-    """, (id_incendio,))
+    if incendio is None:
 
-    dato = cursor.fetchone()
-
-    conexion.close()
-
-    if dato is None:
         print("Incendio inexistente.")
         return
 
-    nombre = dato[0]
-    latitud = dato[1]
-    longitud = dato[2]
-    descripcion = dato[3]
+    # -----------------------------
+    # Datos
+    # -----------------------------
+
+    latitud = incendio[6]
+    longitud = incendio[7]
+    nombre = incendio[3]
+
+    escribir_log(f"Generando mapa de {nombre}")
+
+    # -----------------------------
+    # Crear KML
+    # -----------------------------
 
     kml = simplekml.Kml()
 
-    pnt = kml.newpoint(
+    carpeta_incendio = kml.newfolder(name="🔥 Incendio")
+
+    carpeta_rutas = kml.newfolder(name="🛣 Rutas")
+
+    carpeta_caminos = kml.newfolder(name="🚜 Caminos")
+
+    carpeta_senderos = kml.newfolder(name="🚶 Senderos")
+
+    # -----------------------------
+    # Punto incendio
+    # -----------------------------
+
+    punto = carpeta_incendio.newpoint(
         name=nombre,
         coords=[(longitud, latitud)]
     )
 
-    pnt.description = descripcion
+    punto.style = estilo_incendio()
 
-    pnt.style.iconstyle.icon.href = \
-        "http://maps.google.com/mapfiles/kml/shapes/firedept.png"
+    # -----------------------------
+    # Descargar red vial
+    # -----------------------------
 
-    if not os.path.exists("kml"):
-        os.mkdir("kml")
+    print("Descargando OpenStreetMap...")
 
-    archivo = f"kml/{nombre}.kml"
+    caminos = obtener_red_vial(
+        latitud,
+        longitud,
+        RADIO_ANALISIS
+    )
+
+    print(f"{len(caminos)} caminos encontrados")
+
+    # -----------------------------
+    # Dibujar
+    # -----------------------------
+
+    for camino in caminos:
+
+        categoria = clasificar_camino(
+            camino["tipo"]
+        )
+
+        linea = None
+
+        if categoria == "ruta":
+
+            linea = carpeta_rutas.newlinestring(
+                name=camino["nombre"],
+                coords=camino["coordenadas"]
+            )
+
+            linea.style = estilo_ruta()
+
+        elif categoria == "camino":
+
+            linea = carpeta_caminos.newlinestring(
+                name=camino["nombre"],
+                coords=camino["coordenadas"]
+            )
+
+            linea.style = estilo_camino()
+
+        elif categoria == "sendero":
+
+            linea = carpeta_senderos.newlinestring(
+                name=camino["nombre"],
+                coords=camino["coordenadas"]
+            )
+
+            linea.style = estilo_sendero()
+
+    # -----------------------------
+    # Guardar
+    # -----------------------------
+
+    os.makedirs(KML_DIR, exist_ok=True)
+
+    archivo = os.path.join(
+        KML_DIR,
+        f"{nombre}.kml"
+    )
 
     kml.save(archivo)
 
+    escribir_log("Mapa generado correctamente.")
+
     print()
-    print("====================================")
-    print("KML generado correctamente")
+
+    print("===================================")
+    print("Mapa generado correctamente")
     print(archivo)
-    print("====================================")
+    print("===================================")

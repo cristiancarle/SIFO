@@ -1,5 +1,5 @@
 import sqlite3
-
+from config import DB
 DB = "datos/incendios.db"
 
 
@@ -105,6 +105,23 @@ def registrar_incendio(
 
     conexion.commit()
     conexion.close()
+
+def obtener_incendio_por_id(id_incendio):
+
+    conexion = sqlite3.connect(DB)
+
+    cursor = conexion.cursor()
+
+    cursor.execute(
+        "SELECT * FROM incendios WHERE id=?",
+        (id_incendio,)
+    )
+
+    incendio = cursor.fetchone()
+
+    conexion.close()
+
+    return incendio
 
 
 def listar_incendios():
