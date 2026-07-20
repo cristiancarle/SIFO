@@ -1,0 +1,36 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Entornos virtuales
+.venv/
+venv/
+env/
+
+# Logs
+logs/
+*.log
+
+# Caché
+cache/
+
+# Archivos temporales
+*.tmp
+*.bak
+
+# Base de datos local (descomentar si no querés versionarla)
+# datos/incendios.db
+
+# Salidas generadas
+kml/
+informes/
+analisis/
+
+# VS Code
+.vscode/
+
+# Sistema operativo
+.DS_Store
+Thumbs.db
