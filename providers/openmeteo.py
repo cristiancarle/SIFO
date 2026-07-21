@@ -27,16 +27,10 @@ def obtener_meteorologia(latitud, longitud):
 
     datos = respuesta.json()["current"]
 
-    return {
+    from core.viento import (
+    grados_a_cardinal,
+    direccion_flecha,
+    clasificar_viento
+    )
 
-        "temperatura": datos["temperature_2m"],
-
-        "humedad": datos["relative_humidity_2m"],
-
-        "viento": datos["wind_speed_10m"],
-
-        "direccion": datos["wind_direction_10m"],
-
-        "rafagas": datos["wind_gusts_10m"]
-
-    }
+    

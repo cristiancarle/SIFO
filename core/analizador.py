@@ -2,7 +2,7 @@ from modulos.database import obtener_incendio_por_id
 from modulos.cartografia import obtener_red_vial
 from providers.openmeteo import obtener_meteorologia
 from config import RADIO_ANALISIS
-
+from core.proyecto import crear_expediente, guardar_json
 
 def analizar_incendio(id_incendio):
 
@@ -47,5 +47,18 @@ def analizar_incendio(id_incendio):
         "red_vial": caminos
 
     }
+    carpeta = crear_expediente(analisis)
+
+guardar_json(
+    carpeta,
+    "analisis.json",
+    analisis
+)
+
+guardar_json(
+    carpeta,
+    "meteorologia.json",
+    analisis["meteorologia"]
+)
 
     return analisis
