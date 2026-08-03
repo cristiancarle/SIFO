@@ -7,7 +7,10 @@ def crear_expediente(analisis):
 
     incendio = analisis["incendio"]
 
-    nombre = f"INC-{incendio['id']:06d}"
+    if incendio.get("id"):
+        nombre = f"INC-{incendio['id']:06d}"
+    else:
+        nombre = f"MANUAL-{incendio['nombre'].replace(' ', '_')}"
 
     carpeta = os.path.join("analisis", nombre)
 

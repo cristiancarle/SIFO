@@ -1,8 +1,12 @@
 from core.analizador import analizar_incendio
 from core.proyecto import guardar_analisis
 
-analisis = analizar_incendio(1)
+resultado = analizar_incendio(1)
+
+if resultado is None:
+    raise SystemExit("No se encontró el incendio con ID 1.")
+
+analisis, carpeta = resultado
 
 guardar_analisis(analisis)
-
-print("Análisis generado correctamente")
+print(f"Análisis generado correctamente en: {carpeta}")

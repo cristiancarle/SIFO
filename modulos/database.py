@@ -1,6 +1,5 @@
 import sqlite3
 from config import DB
-DB = "datos/incendios.db"
 
 
 def conectar():
