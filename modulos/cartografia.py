@@ -1,28 +1,21 @@
+try:
+    import osmnx as ox
+except ImportError:
+    ox = None
+
 from config import NETWORK_TYPE
 from modulos.utilidades import escribir_log
 
 
-def _import_osmnx():
-    try:
-        import osmnx as ox
-        return ox
-    except ImportError as exc:
-        raise ImportError(
-            "El módulo osmnx no está instalado. Instale `pip install osmnx` "
-            "para usar la red vial y la generación de KML."
-        ) from exc
-
-
 def obtener_red_vial(latitud, longitud, radio):
 
-    escribir_log("Descargando red vial desde OpenStreetMap...")
-
-    try:
-        ox = _import_osmnx()
-    except ImportError as exc:
-        escribir_log(str(exc))
-        print(str(exc))
+    if ox is None:
+        escribir_log(
+            "OSMnx no está instalado; la capa de red vial será omitida."
+        )
         return []
+
+    escribir_log("Descargando red vial desde OpenStreetMap...")
 
     grafo = ox.graph_from_point(
         (latitud, longitud),
@@ -64,17 +57,14 @@ def clasificar_camino(tipo):
     if isinstance(tipo, list):
         tipo = tipo[0]
 
-    if tipo in ["motorway", "trunk"]:
+    if tipo in ["motorway", "trunk", "primary"]:
         return "ruta"
 
-    if tipo == "primary":
-        return "primaria"
-
-    if tipo == "secondary":
-        return "secundaria"
-
-    if tipo in ["tertiary", "track", "service", "unclassified", "residential", "living_street", "road"]:
+    if tipo in ["secondary", "tertiary"]:
         return "camino"
+
+    if tipo in ["track", "service", "unclassified"]:
+        return "rural"
 
     if tipo in ["path", "footway", "cycleway"]:
         return "sendero"

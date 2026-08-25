@@ -1,111 +1,104 @@
 from config import ICONO_INCENDIO
 
 
-def _require_simplekml():
-    try:
-        import simplekml
-        return simplekml
-    except ImportError as exc:
-        raise ImportError(
-            "El paquete 'simplekml' no está instalado. Instale `pip install simplekml` "
-            "para usar las funciones de estilo KML."
-        ) from exc
-
-
 def estilo_incendio():
 
-    simplekml = _require_simplekml()
-    s = simplekml.Style()
-
-    s.iconstyle.icon.href = ICONO_INCENDIO
-    s.iconstyle.scale = 1.4
-
-    return s
+    return {
+        "id": "incendio",
+        "icon_href": ICONO_INCENDIO,
+        "icon_scale": "1.4"
+    }
 
 
 def estilo_ruta():
 
-    simplekml = _require_simplekml()
-    s = simplekml.Style()
-
-    s.linestyle.width = 4
-    s.linestyle.color = simplekml.Color.red
-
-    return s
-
-
-def estilo_primaria():
-
-    simplekml = _require_simplekml()
-    s = simplekml.Style()
-
-    s.linestyle.width = 4
-    s.linestyle.color = simplekml.Color.blue
-
-    return s
-
-
-def estilo_secundaria():
-
-    simplekml = _require_simplekml()
-    s = simplekml.Style()
-
-    s.linestyle.width = 3
-    s.linestyle.color = simplekml.Color.yellow
-
-    return s
+    return {
+        "id": "ruta",
+        "line_color": "ff0000ff",
+        "line_width": "4"
+    }
 
 
 def estilo_camino():
 
-    simplekml = _require_simplekml()
-    s = simplekml.Style()
-
-    s.linestyle.width = 2
-    s.linestyle.color = simplekml.Color.orange
-
-    return s
+    return {
+        "id": "camino",
+        "line_color": "ff00a5ff",
+        "line_width": "2"
+    }
 
 
 def estilo_sendero():
 
-    simplekml = _require_simplekml()
-    s = simplekml.Style()
+    return {
+        "id": "sendero",
+        "line_color": "ff808080",
+        "line_width": "1"
+    }
 
-    s.linestyle.width = 1
-    s.linestyle.color = simplekml.Color.gray
 
-    return s
+def estilo_simulacion():
+
+    return {
+        "id": "simulacion",
+        "line_color": "ff00ffff",
+        "line_width": "2",
+        "poly_color": "2800ccff"
+    }
 
 
 def estilo_viento():
 
-    simplekml = _require_simplekml()
-    s = simplekml.Style()
-
-    s.linestyle.width = 4
-    s.linestyle.color = simplekml.Color.blue
-
-    return s
+    return {
+        "id": "viento",
+        "line_color": "ffff0000",
+        "line_width": "5"
+    }
 
 
 def estilo_carrera_primaria():
 
-    simplekml = _require_simplekml()
-    s = simplekml.Style()
-
-    s.linestyle.width = 5
-    s.linestyle.color = simplekml.Color.red
-
-    return s
+    return {
+        "id": "carrera_primaria",
+        "line_color": "ff4444ff",
+        "line_width": "4"
+    }
 
 
 def estilo_carrera_secundaria():
 
-    simplekml = _require_simplekml()
-    s = simplekml.Style()
+    return {
+        "id": "carrera_secundaria",
+        "line_color": "ffff6600",
+        "line_width": "3"
+    }
 
-    s.linestyle.width = 3
-    s.linestyle.color = simplekml.Color.orange
 
-    return s
+def estilos_heatmap():
+
+    return [
+        {
+            "id": "heatmap_critico",
+            "line_color": "ff0033ff",
+            "line_width": "1.5",
+            "poly_color": "d00000ff"
+        },
+        {
+            "id": "heatmap_alto",
+            "line_color": "ff0066ff",
+            "line_width": "1.5",
+            "poly_color": "a0146eff"
+        },
+        {
+            "id": "heatmap_medio",
+            "line_color": "ff00b4ff",
+            "line_width": "1.5",
+            "poly_color": "7828b4ff"
+        },
+        {
+            "id": "heatmap_bajo",
+            "line_color": "ff00ffff",
+            "line_width": "1.5",
+            "poly_color": "5040ffff"
+        }
+    ]

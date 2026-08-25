@@ -1,8 +1,10 @@
+import os
 import sqlite3
 from config import DB
 
 
 def conectar():
+    os.makedirs(os.path.dirname(DB), exist_ok=True)
     return sqlite3.connect(DB)
 
 
@@ -107,7 +109,7 @@ def registrar_incendio(
 
 def obtener_incendio_por_id(id_incendio):
 
-    conexion = sqlite3.connect(DB)
+    conexion = conectar()
 
     cursor = conexion.cursor()
 
