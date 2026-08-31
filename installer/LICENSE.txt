@@ -1,0 +1,6 @@
+SIFO
+
+Este software se distribuye como una aplicación final para Windows.
+No incluye garantías ni soporte por parte del autor del código original.
+
+Uso de la aplicación bajo responsabilidad del usuario.

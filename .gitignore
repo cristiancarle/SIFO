@@ -1,0 +1,44 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Entornos virtuales
+.venv/
+venv/
+env/
+.venv-installer/
+
+# Logs
+logs/
+*.log
+
+# Caché
+cache/
+.pytest_cache/
+
+# Archivos temporales
+*.tmp
+*.bak
+
+# Base de datos local (descomentar si no querés versionarla)
+# datos/incendios.db
+
+# Salidas generadas
+kml/
+informes/
+analisis/
+installer/build/
+installer/dist/
+installer/output/
+installer/*.exe
+
+tmp/
+
+# VS Code
+.vscode/
+
+# Sistema operativo
+.DS_Store
+Thumbs.db
