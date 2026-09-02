@@ -33,6 +33,7 @@ installer/build/
 installer/dist/
 installer/output/
 installer/*.exe
+installer.zip
 
 tmp/
 
