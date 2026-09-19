@@ -158,6 +158,70 @@ def _analisis_horario(incendio):
     }
 
 
+def _resumen_analisis_ia(incendio, riesgo, nivel, condiciones, pronostico, estrategia):
+    riesgo_max = max(pronostico, key=lambda item: item['indice'])
+    vegetation = condiciones.get('vegetacion', 'matorral')
+    pendiente = condiciones.get('pendiente', 12)
+    viento = condiciones.get('viento', 18)
+    humedad = condiciones.get('humedad', 35)
+    temp = condiciones.get('temperatura', 'n/d')
+
+    resumen = {
+        'nivel_riesgo': f'{nivel} ({riesgo}/10)',
+        'analisis_ia_propagacion': (
+            f'El análisis de IA estima que el incendio mantiene un comportamiento {nivel.lower()} con un riesgo operativo de {riesgo}/10. '
+            f'La propagación será más intensa en el flanco de viento y en sectores con pendiente superior al 15%, donde la velocidad '
+            f'de avance puede superar al resto del perímetro durante la ventana de mayor energía térmica.'
+        ),
+        'prediccion_propagacion': (
+            f'Se prevé que la propagación alcance aproximadamente {riesgo_max["propagacion_m"]} m en {riesgo_max["hora"]}, con viento medio '
+            f'de {riesgo_max["viento_kmh"]} km/h y rachas de {riesgo_max["rafagas"]} km/h, favoreciendo un avance acelerado hacia '
+            f'la zona de mayor pendiente y menor humedad.'
+        ),
+        'resumen_meteorologico': (
+            f'Vento {viento} km/h, humedad relativa {humedad}%, temperatura {temp}°C, y dirección predominante cercana a la del avance actual. '
+            f'La combinación de bajo contenido hídrico y rafagas sostenidas eleva la intensidad del fuego durante la tarde y primeros horarios '
+            f'de la noche.'
+        ),
+        'resumen_topografico': _topografia_descripcion(pendiente),
+        'pronostico_24_horas': (
+            f'La mayor severidad se concentra en la ventana {riesgo_max["hora"]}, con riesgo {riesgo_max["severidad"]} y un índice estimado '
+            f'de {riesgo_max["indice"]}. Durante las próximas 24 horas se mantiene una tendencia de avance progresivo en el flanco de viento '
+            f'con episodios de mayor velocidad en los tramos más secos y con mayor inclinación.'
+        ),
+        'resumen_combustible': (
+            f'El combustible predominante es {vegetation}, con carga de energía moderada a elevada y capacidad de disipación del calor acentuada '
+            f'en sectores con pendiente y viento alineados. Este tipo de cobertura favorece la ignición y la propagación de llamas rápidas.'
+        ),
+        'recomendaciones_operativas': (
+            f'Priorizar la protección del flanco de viento, consolidar la línea de contención y mantener vigilancia activa de los sectores '
+            f'más inclinados. Coordinar abastecimiento de agua, rotación de personal y preparación de rutas de escape antes de la hora de mayor riesgo.'
+        ),
+        'estrategias_trabajo_sugeridas': ' ; '.join(estrategia['acciones']),
+        'observaciones': estrategia['observaciones'],
+    }
+    return resumen
+
+
+def _guardar_informe_txt(ruta_txt, nombre_incendio, resumen_ia):
+    encabezado = [
+        f'Informe 24 hs - {nombre_incendio}',
+        '',
+        f'Nivel de riesgo: {resumen_ia["nivel_riesgo"]}',
+        f'Analisis IA de propagacion: {resumen_ia["analisis_ia_propagacion"]}',
+        f'Prediccion de la propagacion: {resumen_ia["prediccion_propagacion"]}',
+        f'resumen meteorologico: {resumen_ia["resumen_meteorologico"]}',
+        f'resumen topografico: {resumen_ia["resumen_topografico"]}',
+        f'Pronóstico en las próximas 24 horas: {resumen_ia["pronostico_24_horas"]}',
+        f'Resumen de combustible: {resumen_ia["resumen_combustible"]}',
+        f'Recomendaciones operativas: {resumen_ia["recomendaciones_operativas"]}',
+        f'Estrategias de trabajo sugeridas: {resumen_ia["estrategias_trabajo_sugeridas"]}',
+        f'Observaciones: {resumen_ia["observaciones"]}',
+    ]
+    with open(ruta_txt, 'w', encoding='utf-8') as archivo:
+        archivo.write('\n'.join(encabezado))
+
+
 def _estrategias_tacticas(forecast, condiciones):
     max_risk = max(forecast, key=lambda item: item['indice'])
     peak_hour = max_risk['hora']
@@ -192,7 +256,7 @@ def _estrategias_tacticas(forecast, condiciones):
     }
 
 
-def _generar_html_dashboard(incendio, riesgo, nivel, condiciones, pronostico, estrategia, analisis_horario=None):
+def _generar_html_dashboard(incendio, riesgo, nivel, condiciones, pronostico, estrategia, analisis_horario=None, resumen_ia=None):
     nombre = incendio[3] or f'Incendio {incendio[0]}'
     provincia = incendio[4] or 'No informado'
     localidad = incendio[5] or 'No informado'
@@ -207,6 +271,7 @@ def _generar_html_dashboard(incendio, riesgo, nivel, condiciones, pronostico, es
 
     topografia_texto = _topografia_descripcion(condiciones['pendiente'])
     analisis_horario = analisis_horario or _analisis_horario(incendio)
+    resumen_ia = resumen_ia or _resumen_analisis_ia(incendio, riesgo, nivel, condiciones, pronostico, estrategia)
     html_text = f'''
     <!DOCTYPE html>
     <html lang="es">
@@ -257,6 +322,20 @@ def _generar_html_dashboard(incendio, riesgo, nivel, condiciones, pronostico, es
         </div>
 
         <div class="section">
+          <h2>Resumen de análisis IA</h2>
+          <p><strong>Nivel de riesgo:</strong> {html_lib.escape(resumen_ia['nivel_riesgo'])}</p>
+          <p><strong>Analisis IA de propagacion:</strong> {html_lib.escape(resumen_ia['analisis_ia_propagacion'])}</p>
+          <p><strong>Prediccion de la propagacion:</strong> {html_lib.escape(resumen_ia['prediccion_propagacion'])}</p>
+          <p><strong>resumen meteorologico:</strong> {html_lib.escape(resumen_ia['resumen_meteorologico'])}</p>
+          <p><strong>resumen topografico:</strong> {html_lib.escape(resumen_ia['resumen_topografico'])}</p>
+          <p><strong>Pronóstico en las próximas 24 horas:</strong> {html_lib.escape(resumen_ia['pronostico_24_horas'])}</p>
+          <p><strong>Resumen de combustible:</strong> {html_lib.escape(resumen_ia['resumen_combustible'])}</p>
+          <p><strong>Recomendaciones operativas:</strong> {html_lib.escape(resumen_ia['recomendaciones_operativas'])}</p>
+          <p><strong>Estrategias de trabajo sugeridas:</strong> {html_lib.escape(resumen_ia['estrategias_trabajo_sugeridas'])}</p>
+          <p><strong>Observaciones:</strong> {html_lib.escape(resumen_ia['observaciones'])}</p>
+        </div>
+
+        <div class="section">
           <h2>Condiciones ambientales</h2>
           <table class="table">
             <tr><th>Parámetro</th><th>Valor</th></tr>
@@ -292,7 +371,7 @@ def _generar_html_dashboard(incendio, riesgo, nivel, condiciones, pronostico, es
     return html_text
 
 
-def _generar_pdf(incendio, riesgo, nivel, condiciones, pronostico, estrategia, pdf_path):
+def _generar_pdf(incendio, riesgo, nivel, condiciones, pronostico, estrategia, pdf_path, resumen_ia=None):
     styles = getSampleStyleSheet()
     title_style = ParagraphStyle('TitleStyle', parent=styles['Title'], fontName='Helvetica-Bold', fontSize=22, textColor=colors.HexColor('#0e4785'), leading=26)
     subtitle_style = ParagraphStyle('SubStyle', parent=styles['BodyText'], fontName='Helvetica', fontSize=10, textColor=colors.HexColor('#4a5a6a'))
@@ -300,6 +379,7 @@ def _generar_pdf(incendio, riesgo, nivel, condiciones, pronostico, estrategia, p
     section_style = ParagraphStyle('SectionTitle', parent=styles['Heading2'], fontName='Helvetica-Bold', fontSize=13, textColor=colors.HexColor('#0e4785'))
 
     topografia_texto = _topografia_descripcion(condiciones['pendiente'])
+    resumen_ia = resumen_ia or _resumen_analisis_ia(incendio, riesgo, nivel, condiciones, pronostico, estrategia)
     elements = []
     elements.append(Paragraph('SIFO - Informe operativo de incendio', title_style))
     elements.append(Paragraph(f'{incendio[3] or "Incendio"} · {incendio[4] or "Provincia"} · {incendio[5] or "Localidad"}', subtitle_style))
@@ -330,6 +410,19 @@ def _generar_pdf(incendio, riesgo, nivel, condiciones, pronostico, estrategia, p
         ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
     ]))
     elements.append(table)
+    elements.append(Spacer(1, 12))
+
+    elements.append(Paragraph('Resumen de análisis IA', section_style))
+    elements.append(Paragraph(f"Nivel de riesgo: {resumen_ia['nivel_riesgo']}", body_style))
+    elements.append(Paragraph(f"Analisis IA de propagacion: {resumen_ia['analisis_ia_propagacion']}", body_style))
+    elements.append(Paragraph(f"Prediccion de la propagacion: {resumen_ia['prediccion_propagacion']}", body_style))
+    elements.append(Paragraph(f"resumen meteorologico: {resumen_ia['resumen_meteorologico']}", body_style))
+    elements.append(Paragraph(f"resumen topografico: {resumen_ia['resumen_topografico']}", body_style))
+    elements.append(Paragraph(f"Pronóstico en las próximas 24 horas: {resumen_ia['pronostico_24_horas']}", body_style))
+    elements.append(Paragraph(f"Resumen de combustible: {resumen_ia['resumen_combustible']}", body_style))
+    elements.append(Paragraph(f"Recomendaciones operativas: {resumen_ia['recomendaciones_operativas']}", body_style))
+    elements.append(Paragraph(f"Estrategias de trabajo sugeridas: {resumen_ia['estrategias_trabajo_sugeridas']}", body_style))
+    elements.append(Paragraph(f"Observaciones: {resumen_ia['observaciones']}", body_style))
     elements.append(Spacer(1, 12))
 
     analisis_horario = _analisis_horario(incendio)
@@ -401,21 +494,29 @@ def generar_informe_incendio(id_incendio):
     condiciones['temperatura'] = 28
     pronostico = _pronostico_24hs(incendio)
     estrategia = _estrategias_tacticas(pronostico, condiciones)
+    resumen_ia = _resumen_analisis_ia(incendio, riesgo, nivel, condiciones, pronostico, estrategia)
     nombre = _sanear_nombre(incendio[3] or f'Incendio {incendio[0]}')
 
     html_path = os.path.join(INFORMES_DIR, f'{nombre}.html')
     pdf_path = os.path.join(INFORMES_DIR, f'{nombre}.pdf')
+    txt_path = os.path.join(INFORMES_DIR, f'{nombre}.txt')
+    txt_24hs_path = os.path.join(INFORMES_DIR, 'informe_24hs.txt')
+    txt_informe_path = os.path.join(INFORMES_DIR, 'informe.txt')
 
     analisis_horario = _analisis_horario(incendio)
+    _guardar_informe_txt(txt_path, nombre, resumen_ia)
+    _guardar_informe_txt(txt_24hs_path, 'informe 24hs', resumen_ia)
+    _guardar_informe_txt(txt_informe_path, 'informe', resumen_ia)
 
     with open(html_path, 'w', encoding='utf-8') as archivo:
-        archivo.write(_generar_html_dashboard(incendio, riesgo, nivel, condiciones, pronostico, estrategia, analisis_horario))
+        archivo.write(_generar_html_dashboard(incendio, riesgo, nivel, condiciones, pronostico, estrategia, analisis_horario, resumen_ia))
 
-    _generar_pdf(incendio, riesgo, nivel, condiciones, pronostico, estrategia, pdf_path)
+    _generar_pdf(incendio, riesgo, nivel, condiciones, pronostico, estrategia, pdf_path, resumen_ia)
 
     print('===================================')
     print('Informe generado correctamente')
     print(f'HTML: {html_path}')
     print(f'PDF:  {pdf_path}')
+    print(f'TXT:  {txt_path}')
     print('===================================')
-    return {'html': html_path, 'pdf': pdf_path}
+    return {'html': html_path, 'pdf': pdf_path, 'txt': txt_path}
