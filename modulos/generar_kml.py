@@ -28,6 +28,7 @@ from modulos.cartografia import (
 from modulos.estilos import (
     estilo_carrera_primaria,
     estilo_carrera_secundaria,
+    estilo_combustible_seco,
     estilo_incendio,
     estilo_ruta,
     estilo_camino,
@@ -129,6 +130,7 @@ def _crear_estructura_base(nombre):
     _crear_style_linea(documento, estilo_viento())
     _crear_style_linea(documento, estilo_carrera_primaria())
     _crear_style_linea(documento, estilo_carrera_secundaria())
+    _crear_style_linea(documento, estilo_combustible_seco())
 
     for estilo in estilos_heatmap():
         _crear_style_linea(documento, estilo)
@@ -234,6 +236,10 @@ def _agregar_linea(folder, nombre, coordenadas, style_id):
     ET.SubElement(linestring, "coordinates").text = _formatear_coordenadas(
         coordenadas
     )
+
+
+def _direccion_propagacion(angulo_viento_grados):
+    return (int(angulo_viento_grados) + 180) % 360
 
 
 def _agregar_flecha_viento(folder, latitud, longitud, distancia_m, angulo_grados):
@@ -445,6 +451,7 @@ def generar_kml(id_incendio):
     kml, documento = _crear_estructura_base(nombre)
 
     carpeta_incendio = _agregar_folder(documento, "Incendio")
+    carpeta_humedad = _agregar_folder(documento, "Riesgo por humedad baja")
     carpeta_heatmap = _agregar_folder(documento, "Mapa de calor")
     carpeta_simulacion = _agregar_folder(documento, "Simulación de avance")
     carpeta_viento = _agregar_folder(documento, "Dirección del viento")
@@ -464,19 +471,21 @@ def generar_kml(id_incendio):
         _descripcion_incendio(incendio)
     )
 
+    direccion_viento = DIRECCION_PROPAGACION_GRADOS
+    direccion_propagacion = _direccion_propagacion(direccion_viento)
+
     _agregar_flecha_viento(
         carpeta_viento,
         latitud,
         longitud,
         5000,
-        DIRECCION_PROPAGACION_GRADOS,
+        direccion_propagacion,
     )
 
-    direccion_viento = DIRECCION_PROPAGACION_GRADOS
     for indice, angulo in enumerate([
-        direccion_viento,
-        (direccion_viento + 15) % 360,
-        (direccion_viento - 15) % 360,
+        direccion_propagacion,
+        (direccion_propagacion + 15) % 360,
+        (direccion_propagacion - 15) % 360,
     ]):
         _agregar_carrera_propagacion(
             carpeta_primarias,
@@ -489,10 +498,10 @@ def generar_kml(id_incendio):
         )
 
     for indice, angulo in enumerate([
-        (direccion_viento + 45) % 360,
-        (direccion_viento - 45) % 360,
-        (direccion_viento + 90) % 360,
-        (direccion_viento - 90) % 360,
+        (direccion_propagacion + 45) % 360,
+        (direccion_propagacion - 45) % 360,
+        (direccion_propagacion + 90) % 360,
+        (direccion_propagacion - 90) % 360,
     ]):
         _agregar_carrera_propagacion(
             carpeta_secundarias,
@@ -516,6 +525,31 @@ def generar_kml(id_incendio):
         factor_ambiental,
         intensidad=1.1
     )
+
+    if escenario_base["humedad"] <= 35:
+        semieje_mayor = max(300, radio_analisis * 0.8)
+        semieje_menor = max(180, radio_analisis * 0.52)
+        for desplazamiento in (0, 0.22, -0.18):
+            poligono_humedad = _generar_elipse(
+                latitud,
+                longitud,
+                semieje_mayor,
+                semieje_menor,
+                escenario_base["direccion_grados"],
+                desplazamiento_m=semieje_mayor * desplazamiento,
+            )
+            _agregar_poligono(
+                carpeta_humedad,
+                f"Sector de riesgo por humedad baja ({escenario_base['humedad']}%)",
+                poligono_humedad,
+                "combustible_seco",
+                (
+                    f"Combustible con humedad relativa baja ({escenario_base['humedad']}%).\n"
+                    "Riesgo potencial de ignición y propagación acelerada si se mantienen estas condiciones."
+                ),
+                inicio=fecha_base,
+                fin=fecha_base + timedelta(hours=12) if fecha_base is not None else None,
+            )
 
     folder_condiciones = _agregar_folder(documento, "Condiciones ambientales")
     descripcion_condiciones = (

@@ -75,8 +75,18 @@ def _riesgo_incendio(incendio):
     }
 
 
-def _pronostico_24hs(incendio):
+def _obtener_hora_inicio_pronostico(incendio):
     inicio = datetime.strptime(f"{incendio[1]} {incendio[2]}", "%d/%m/%Y %H:%M")
+
+    if inicio.hour >= 18:
+        inicio_base = datetime(inicio.year, inicio.month, inicio.day) + timedelta(days=1)
+        return inicio_base.replace(hour=0, minute=0)
+
+    return datetime(inicio.year, inicio.month, inicio.day, 12, 0)
+
+
+def _pronostico_24hs(incendio):
+    inicio = _obtener_hora_inicio_pronostico(incendio)
     vegetacion = 'matorral'
     pendiente = 12
     base_temp = 28
@@ -89,7 +99,10 @@ def _pronostico_24hs(incendio):
         humedad = round(max(8, min(90, 62 - (hora.hour * 1.7) + (pendiente * 0.5) - MAPA_COMBUSTIBLE[vegetacion] * 7)), 1)
         temperatura = round(max(18, min(46, base_temp + (hora.hour * 0.7) + (pendiente / 4) + MAPA_COMBUSTIBLE[vegetacion] * 5)), 1)
         rachas = round(viento_kmh + 6 + abs(ciclo) * 10, 1)
-        direccion = (120 + paso * 4 + int(pendiente * 2)) % 360
+        direccion = 135 - (paso * 2.0)
+        if direccion < 0:
+            direccion = 360 + direccion
+        direccion = round(direccion, 0)
         indice_riesgo = round(max(0.5, min(9.9, 1.1 + (viento_kmh / 14) + ((100 - humedad) / 50) + (pendiente / 25) + MAPA_COMBUSTIBLE[vegetacion] * 0.8)), 2)
         severidad = 'Crítico' if indice_riesgo >= 7.5 else 'Alto' if indice_riesgo >= 5.5 else 'Medio' if indice_riesgo >= 3.5 else 'Bajo' if indice_riesgo >= 2 else 'Muy bajo'
         propagacion = round(max(40, min(2400, 120 + indice_riesgo * 110 + (pendiente * 18))), 0)
