@@ -1,0 +1,82 @@
+
+    <!DOCTYPE html>
+    <html lang="es">
+    <head>
+      <meta charset="UTF-8" />
+      <title>Informe SIFO - Cañada</title>
+      <style>
+        body { font-family: Arial, sans-serif; background: #f4f6fb; margin: 0; padding: 32px; color: #16314d; }
+        .container { max-width: 1200px; margin: 0 auto; }
+        .header { background: linear-gradient(135deg, #0e4785, #d84545); color: white; padding: 28px 30px; border-radius: 18px; box-shadow: 0 10px 30px rgba(12,34,61,0.15); }
+        .header h1 { margin: 0; font-size: 32px; }
+        .header p { margin: 8px 0 0; opacity: 0.9; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 18px; margin-top: 24px; }
+        .card { background: white; border-radius: 16px; padding: 18px 20px; box-shadow: 0 8px 20px rgba(15,35,64,0.08); border-left: 7px solid #0e4785; }
+        .label { font-size: 11px; letter-spacing: 1px; text-transform: uppercase; color: #64748b; }
+        .value { font-size: 22px; font-weight: 700; margin-top: 8px; }
+        .risk { border-left-color: #d84545; }
+        .risk .value { color: #d84545; }
+        .section { background: white; border-radius: 16px; padding: 24px; margin-top: 24px; box-shadow: 0 8px 20px rgba(15,35,64,0.08); }
+        .section h2 { margin-top: 0; font-size: 22px; }
+        .table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+        .table th, .table td { border-bottom: 1px solid #e8edf5; padding: 10px 12px; text-align: left; }
+        .table th { background: #edf4ff; color: #15304a; }
+        .badge { display: inline-block; padding: 8px 14px; border-radius: 999px; font-weight: 700; background: #ffe7e7; color: #a42525; }
+        .small { color: #5a6e86; font-size: 14px; }
+        ul { padding-left: 20px; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <h1>SIFO - Informe operativo de incendio</h1>
+          <p>Cañada · Córdoba · Jeanmaire</p>
+        </div>
+
+        <div class="grid">
+          <div class="card"><div class="label">Fecha</div><div class="value">26/09/2026</div></div>
+          <div class="card"><div class="label">Hora</div><div class="value">12:35</div></div>
+          <div class="card"><div class="label">Coordenadas</div><div class="value">-31.48386, -62.40903</div></div>
+          <div class="card risk"><div class="label">Riesgo estimado</div><div class="value">2.02 / 10</div></div>
+        </div>
+
+        <div class="section">
+          <h2>Resumen operativo</h2>
+          <p><strong>Estado:</strong> ACTIVO &nbsp; <span class="badge">Bajo</span></p>
+          <p class="small">Sin descripción</p>
+          <p class="small"><strong>Hora pico prevista:</strong> 27/09 06:00 · <strong>Riesgo pico:</strong> 6.61</p>
+        </div>
+
+        <div class="section">
+          <h2>Condiciones ambientales</h2>
+          <table class="table">
+            <tr><th>Parámetro</th><th>Valor</th></tr>
+            <tr><td>Viento</td><td>19.2 km/h</td></tr>
+            <tr><td>Humedad relativa</td><td>42%</td></tr>
+            <tr><td>Temperatura</td><td>28°C</td></tr>
+            <tr><td>Pendiente</td><td>34.0%</td></tr>
+            <tr><td>Vegetación dominante</td><td>matorral</td></tr>
+            <tr><td>Topografía</td><td>Pendiente moderada, con riesgo de aceleración del fuego en sectores de evacuación.</td></tr>
+          </table>
+          <p class="small"><strong>Patrón horario:</strong> Horario diurno · En horario diurno, el viento suele reforzarse con el calentamiento y la pendiente favorece la propagación si el viento y la ladera están alineados. Es el período con mayor intensidad cuando el fuego avanza en la misma dirección del viento y la pendiente.</p>
+        </div>
+
+        <div class="section">
+          <h2>Pronóstico meteorológico 24 hs (cada 3 hs)</h2>
+          <table class="table">
+            <tr><th>Hora</th><th>Viento</th><th>Rachas</th><th>Dirección</th><th>Humedad</th><th>Temperatura</th><th>Severidad</th></tr>
+            <tr><td>26/09 12:00</td><td>29.6 km/h</td><td>35.6 km/h</td><td>135.0°</td><td>38.9%</td><td>45.6°C</td><td>Alto</td></tr><tr><td>26/09 15:00</td><td>23.0 km/h</td><td>36.1 km/h</td><td>129.0°</td><td>33.8%</td><td>46°C</td><td>Alto</td></tr><tr><td>26/09 18:00</td><td>20.5 km/h</td><td>36.5 km/h</td><td>123.0°</td><td>28.7%</td><td>46°C</td><td>Medio</td></tr><tr><td>26/09 21:00</td><td>23.8 km/h</td><td>36.9 km/h</td><td>117.0°</td><td>23.6%</td><td>46°C</td><td>Alto</td></tr><tr><td>27/09 00:00</td><td>31.3 km/h</td><td>37.3 km/h</td><td>111.0°</td><td>59.2%</td><td>37.2°C</td><td>Alto</td></tr><tr><td>27/09 03:00</td><td>38.8 km/h</td><td>51.9 km/h</td><td>105.0°</td><td>54.1%</td><td>39.4°C</td><td>Alto</td></tr><tr><td>27/09 06:00</td><td>42.2 km/h</td><td>58.2 km/h</td><td>99.0°</td><td>49.0%</td><td>41.5°C</td><td>Alto</td></tr><tr><td>27/09 09:00</td><td>39.7 km/h</td><td>52.8 km/h</td><td>93.0°</td><td>44.0%</td><td>43.5°C</td><td>Alto</td></tr><tr><td>27/09 12:00</td><td>33.0 km/h</td><td>39.0 km/h</td><td>87.0°</td><td>38.9%</td><td>45.6°C</td><td>Alto</td></tr>
+          </table>
+        </div>
+
+        <div class="section">
+          <h2>Estrategias y tácticas para bomberos</h2>
+          <p><strong>Visión operativa:</strong> Aplicar un esquema de ataque indirecto en el flanco de mayor intensidad, con despegue y control del perímetro en la franja de máxima pendiente y menor humedad.</p>
+          <p><strong>Línea de defensa:</strong> Consolidar la zona de transición entre combustible denso y área de intervención, evitando avances en paralelo al viento.</p>
+          <ul><li>Desactivar la operación de ataque frontal durante la ventana más crítica y reforzar el flanco bajo el viento.</li><li>Priorizar cortafuegos y limpieza de combustible en el sector de avance del viento.</li><li>Mantener dos líneas de defensa: una de ataque directo y una de contención en el flanco opuesto.</li><li>Reforzar vigilancia y rutas de escape para personal bajo ráfagas superiores a 30 km/h.</li><li>Definir puntos de agua y abastecimiento previo a la hora pico de riesgo.</li><li>Ajustar el despliegue del helicóptero y medios aéreos en la hora de mayor intensidad.</li><li>Asegurar la evacuación preventiva de personal en zonas de pendiente y combustibles secos.</li></ul>
+          <p class="small"><strong>Observación:</strong> Con vegetación matorral, pendiente 34.0% y humedad 42%, la mayor propagación se concentra en la ventana 27/09 06:00.</p>
+        </div>
+      </div>
+    </body>
+    </html>
+    

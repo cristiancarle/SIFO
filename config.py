@@ -19,7 +19,7 @@ DB = os.path.join(DATOS_DIR, "incendios.db")
 RADIO_ANALISIS = 10000      # metros
 PASOS_SIMULACION_MINUTOS = (30, 60, 120, 180, 360)
 FACTOR_PROPAGACION_VIENTO = 1.8
-DIRECCION_PROPAGACION_GRADOS = 35
+DIRECCION_PROPAGACION_GRADOS = 270
 VELOCIDAD_VIENTO_KMH = 18
 HUMEDAD_RELATIVA = 35
 PENDIENTE_MEDIA = 12
@@ -47,11 +47,11 @@ CARGA_COMBUSTIBLE = {
 
 # Perfil horario más realista para la simulación por tramos temporales
 ESCENARIOS_HORARIOS = (
-    {"viento_kmh": 18, "direccion_grados": 35, "humedad": 35, "pendiente": 12, "vegetacion": "matorral"},
-    {"viento_kmh": 22, "direccion_grados": 42, "humedad": 30, "pendiente": 15, "vegetacion": "matorral"},
-    {"viento_kmh": 28, "direccion_grados": 48, "humedad": 26, "pendiente": 18, "vegetacion": "bosque"},
-    {"viento_kmh": 34, "direccion_grados": 55, "humedad": 22, "pendiente": 22, "vegetacion": "bosque"},
-    {"viento_kmh": 39, "direccion_grados": 62, "humedad": 18, "pendiente": 26, "vegetacion": "pinar"}
+    {"viento_kmh": 18, "direccion_grados": 135, "humedad": 35, "pendiente": 12, "vegetacion": "matorral"},
+    {"viento_kmh": 22, "direccion_grados": 120, "humedad": 30, "pendiente": 15, "vegetacion": "matorral"},
+    {"viento_kmh": 28, "direccion_grados": 105, "humedad": 26, "pendiente": 18, "vegetacion": "bosque"},
+    {"viento_kmh": 34, "direccion_grados": 95, "humedad": 22, "pendiente": 22, "vegetacion": "bosque"},
+    {"viento_kmh": 39, "direccion_grados": 90, "humedad": 18, "pendiente": 26, "vegetacion": "pinar"}
 )
 
 ESCALAS_HEATMAP = (

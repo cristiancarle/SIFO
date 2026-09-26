@@ -74,6 +74,16 @@ def estilo_carrera_secundaria():
     }
 
 
+def estilo_combustible_seco():
+
+    return {
+        "id": "combustible_seco",
+        "line_color": "ffff7a00",
+        "line_width": "2.5",
+        "poly_color": "66ff8c00"
+    }
+
+
 def estilos_heatmap():
 
     return [
