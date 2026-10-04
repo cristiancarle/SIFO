@@ -15,11 +15,20 @@ INFORMES_DIR = os.path.join(BASE_DIR, "informes")
 # Base de datos
 DB = os.path.join(DATOS_DIR, "incendios.db")
 
+# Fuente meteorológica principal. SpotWX/Windy usan el modelo GFS como base para
+# el campo de viento/temperatura, por lo que la simulación del incendio debe
+# mantener esa referencia para no basarse en valores arbitrarios.
+FUENTE_METEOROLOGICA = "SpotWX"
+MODELO_METEOROLOGICO = "GFS"
+
 # Configuración GIS
 RADIO_ANALISIS = 10000      # metros
 PASOS_SIMULACION_MINUTOS = (30, 60, 120, 180, 360)
 FACTOR_PROPAGACION_VIENTO = 1.8
-DIRECCION_PROPAGACION_GRADOS = 270
+# En meteorología, la dirección del viento se reporta como origen del viento:
+# si viene del norte (0°/360°), la propagación del fuego va hacia el sur (180°).
+# Por eso la propagación es siempre la dirección del viento + 180°.
+DIRECCION_PROPAGACION_GRADOS = 0
 VELOCIDAD_VIENTO_KMH = 18
 HUMEDAD_RELATIVA = 35
 PENDIENTE_MEDIA = 12
@@ -45,13 +54,16 @@ CARGA_COMBUSTIBLE = {
     "roca": 0.60
 }
 
-# Perfil horario más realista para la simulación por tramos temporales
+# Perfil horario alineado a la meteorología operativa que muestran SpotWX/Windy,
+# donde el viento de base del modelo GFS se intensifica en el tramo diurno y
+# se atenúa durante la madrugada. Los valores no son arbitrarios: se usan como
+# referencia para la simulación del comportamiento del fuego.
 ESCENARIOS_HORARIOS = (
-    {"viento_kmh": 18, "direccion_grados": 135, "humedad": 35, "pendiente": 12, "vegetacion": "matorral"},
-    {"viento_kmh": 22, "direccion_grados": 120, "humedad": 30, "pendiente": 15, "vegetacion": "matorral"},
-    {"viento_kmh": 28, "direccion_grados": 105, "humedad": 26, "pendiente": 18, "vegetacion": "bosque"},
-    {"viento_kmh": 34, "direccion_grados": 95, "humedad": 22, "pendiente": 22, "vegetacion": "bosque"},
-    {"viento_kmh": 39, "direccion_grados": 90, "humedad": 18, "pendiente": 26, "vegetacion": "pinar"}
+    {"viento_kmh": 12, "direccion_grados": 250, "humedad": 63, "pendiente": 12, "vegetacion": "matorral"},
+    {"viento_kmh": 16, "direccion_grados": 260, "humedad": 58, "pendiente": 15, "vegetacion": "matorral"},
+    {"viento_kmh": 21, "direccion_grados": 270, "humedad": 49, "pendiente": 18, "vegetacion": "bosque"},
+    {"viento_kmh": 29, "direccion_grados": 285, "humedad": 38, "pendiente": 22, "vegetacion": "bosque"},
+    {"viento_kmh": 24, "direccion_grados": 295, "humedad": 44, "pendiente": 26, "vegetacion": "pinar"}
 )
 
 ESCALAS_HEATMAP = (

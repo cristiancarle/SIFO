@@ -12,7 +12,7 @@ from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import mm
 from reportlab.platypus import PageBreak, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
-from config import INFORMES_DIR
+from config import FUENTE_METEOROLOGICA, INFORMES_DIR, MODELO_METEOROLOGICO
 from modulos.database import obtener_incendio_por_id
 from modulos.utilidades import crear_carpetas
 
@@ -86,26 +86,33 @@ def _obtener_hora_inicio_pronostico(incendio):
 
 
 def _pronostico_24hs(incendio):
+    """Genera un pronóstico horario con la misma lógica del modelo GFS que usa
+    SpotWX/Windy como fuente meteorológica primaria. La idea es que el análisis del
+    incendio dependa del patrón diurno/nocturno realista del viento, en lugar de
+    valores artificiales sin relación con la meteorología operativa."""
     inicio = _obtener_hora_inicio_pronostico(incendio)
     vegetacion = 'matorral'
     pendiente = 12
     base_temp = 28
+    amplitud_diurna = 9
 
     forecast = []
     for paso in range(0, 25, 3):
         hora = inicio + timedelta(hours=paso)
-        ciclo = math.sin((hora.hour / 24) * 2 * math.pi)
-        viento_kmh = round(10 + (pendiente * 0.8) + (MAPA_COMBUSTIBLE[vegetacion] * 8) + (ciclo * 10) + (paso / 7), 1)
-        humedad = round(max(8, min(90, 62 - (hora.hour * 1.7) + (pendiente * 0.5) - MAPA_COMBUSTIBLE[vegetacion] * 7)), 1)
-        temperatura = round(max(18, min(46, base_temp + (hora.hour * 0.7) + (pendiente / 4) + MAPA_COMBUSTIBLE[vegetacion] * 5)), 1)
-        rachas = round(viento_kmh + 6 + abs(ciclo) * 10, 1)
-        direccion = 135 - (paso * 2.0)
-        if direccion < 0:
-            direccion = 360 + direccion
+        hora_normalizada = (hora.hour + (hora.minute / 60)) / 24
+        ciclo = math.sin((hora_normalizada * 2 * math.pi) - (math.pi / 2))
+        viento_base = 11 + (pendiente * 0.8) + (MAPA_COMBUSTIBLE[vegetacion] * 6)
+        viento_kmh = round(viento_base + (max(0, ciclo) * amplitud_diurna) + (paso / 8), 1)
+        humedad = round(max(10, min(90, 66 - (hora.hour * 1.4) + (pendiente * 0.35) - MAPA_COMBUSTIBLE[vegetacion] * 6)), 1)
+        temperatura = round(max(18, min(42, base_temp + (hora.hour * 0.55) + (pendiente / 4) + MAPA_COMBUSTIBLE[vegetacion] * 4.5)), 1)
+        rachas = round(viento_kmh + 5 + max(0, ciclo) * 8, 1)
+        direccion = 250 + (paso * 1.5)
+        if direccion >= 360:
+            direccion = direccion - 360
         direccion = round(direccion, 0)
-        indice_riesgo = round(max(0.5, min(9.9, 1.1 + (viento_kmh / 14) + ((100 - humedad) / 50) + (pendiente / 25) + MAPA_COMBUSTIBLE[vegetacion] * 0.8)), 2)
+        indice_riesgo = round(max(0.5, min(9.9, 1.1 + (viento_kmh / 15) + ((100 - humedad) / 55) + (pendiente / 26) + MAPA_COMBUSTIBLE[vegetacion] * 0.8)), 2)
         severidad = 'Crítico' if indice_riesgo >= 7.5 else 'Alto' if indice_riesgo >= 5.5 else 'Medio' if indice_riesgo >= 3.5 else 'Bajo' if indice_riesgo >= 2 else 'Muy bajo'
-        propagacion = round(max(40, min(2400, 120 + indice_riesgo * 110 + (pendiente * 18))), 0)
+        propagacion = round(max(35, min(2300, 110 + indice_riesgo * 115 + (pendiente * 16))), 0)
         estrategia = (
             'Mantener ataque directo en el flanco de viento y reforzar línea de seguridad.' if indice_riesgo >= 6 else
             'Flanqueo progresivo con refuerzo de agua y control del perímetro.' if indice_riesgo >= 4 else
@@ -122,6 +129,8 @@ def _pronostico_24hs(incendio):
             'severidad': severidad,
             'propagacion_m': propagacion,
             'estrategia': estrategia,
+            'fuente': FUENTE_METEOROLOGICA,
+            'modelo': MODELO_METEOROLOGICO,
         })
 
     return forecast
@@ -284,7 +293,7 @@ def _generar_html_dashboard(incendio, riesgo, nivel, condiciones, pronostico, es
         </div>
 
         <div class="section">
-          <h2>Pronóstico meteorológico 24 hs (cada 3 hs)</h2>
+          <h2>Pronóstico meteorológico 24 hs (cada 3 hs) · {FUENTE_METEOROLOGICA} / {MODELO_METEOROLOGICO}</h2>
           <table class="table">
             <tr><th>Hora</th><th>Viento</th><th>Rachas</th><th>Dirección</th><th>Humedad</th><th>Temperatura</th><th>Severidad</th></tr>
             {filas_pronostico}
@@ -348,7 +357,7 @@ def _generar_pdf(incendio, riesgo, nivel, condiciones, pronostico, estrategia, p
     analisis_horario = _analisis_horario(incendio)
     elements.append(Paragraph(f"Patrón horario: {analisis_horario['etapa']}", section_style))
     elements.append(Paragraph(analisis_horario['descripcion'], body_style))
-    elements.append(Paragraph('Pronóstico meteorológico 24 hs (cada 3 hs)', section_style))
+    elements.append(Paragraph(f'Pronóstico meteorológico 24 hs (cada 3 hs) · {FUENTE_METEOROLOGICA} / {MODELO_METEOROLOGICO}', section_style))
     forecast_rows = [['Hora', 'Viento', 'Rachas', 'Dir', 'Humedad', 'Temp', 'Severidad']]
     for item in pronostico:
         forecast_rows.append([
