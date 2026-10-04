@@ -423,6 +423,16 @@ def _descripcion_simulacion(minutos, semieje_mayor, semieje_menor):
     )
 
 
+def _direccion_cardinal(grados):
+    if grados is None:
+        return "N/D"
+
+    puntos = ["N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE", "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW"]
+    valor = (float(grados) % 360 + 360) % 360
+    indice = int((valor + 11.25) / 22.5) % 16
+    return puntos[indice]
+
+
 def generar_kml(id_incendio):
 
     incendio = obtener_incendio_por_id(id_incendio)
@@ -471,7 +481,8 @@ def generar_kml(id_incendio):
         _descripcion_incendio(incendio)
     )
 
-    direccion_viento = DIRECCION_PROPAGACION_GRADOS
+    escenario_base = _obtener_escenario_hora(0)
+    direccion_viento = escenario_base["direccion_grados"]
     direccion_propagacion = _direccion_propagacion(direccion_viento)
 
     _agregar_flecha_viento(
@@ -479,7 +490,7 @@ def generar_kml(id_incendio):
         latitud,
         longitud,
         5000,
-        direccion_propagacion,
+        direccion_viento,
     )
 
     for indice, angulo in enumerate([
@@ -535,7 +546,7 @@ def generar_kml(id_incendio):
                 longitud,
                 semieje_mayor,
                 semieje_menor,
-                escenario_base["direccion_grados"],
+                _direccion_propagacion(escenario_base["direccion_grados"]),
                 desplazamiento_m=semieje_mayor * desplazamiento,
             )
             _agregar_poligono(
@@ -554,7 +565,8 @@ def generar_kml(id_incendio):
     folder_condiciones = _agregar_folder(documento, "Condiciones ambientales")
     descripcion_condiciones = (
         f"Viento: {escenario_base['viento_kmh']} km/h\n"
-        f"Dirección principal: {escenario_base['direccion_grados']}°\n"
+        f"Dirección del viento (origen): {escenario_base['direccion_grados']}° ({_direccion_cardinal(escenario_base['direccion_grados'])})\n"
+        f"Propagación estimada (hacia): {_direccion_propagacion(escenario_base['direccion_grados'])}° ({_direccion_cardinal(_direccion_propagacion(escenario_base['direccion_grados']))})\n"
         f"Humedad relativa: {escenario_base['humedad']}%\n"
         f"Pendiente media: {escenario_base['pendiente']}%\n"
         f"Vegetación dominante: {escenario_base['vegetacion']}\n"
@@ -580,7 +592,7 @@ def generar_kml(id_incendio):
             longitud,
             semieje_mayor,
             semieje_menor,
-            escenario_base["direccion_grados"],
+            _direccion_propagacion(escenario_base["direccion_grados"]),
             desplazamiento_m=semieje_mayor * 0.18
         )
         _agregar_poligono(
@@ -614,7 +626,7 @@ def generar_kml(id_incendio):
             longitud,
             semieje_mayor,
             semieje_menor,
-            escenario["direccion_grados"],
+            _direccion_propagacion(escenario["direccion_grados"]),
             desplazamiento_m=semieje_mayor * 0.18
         )
         inicio = fecha_base
