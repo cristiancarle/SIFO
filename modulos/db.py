@@ -11,8 +11,19 @@ import os
 import sqlite3
 import threading
 
-DATABASE_URL = os.environ.get("DATABASE_URL", "").strip()
+def _limpiar_url(url):
+    """Tolera lo que suele pegarse desde los paneles: espacios, comillas o el prefijo `psql`."""
+    url = (url or "").strip()
+    if url.startswith("psql "):
+        url = url[5:].strip()
+    return url.strip("'\"").strip()
+
+
+DATABASE_URL = _limpiar_url(os.environ.get("DATABASE_URL"))
 ES_PG = DATABASE_URL.startswith(("postgres://", "postgresql://"))
+if DATABASE_URL and not ES_PG:
+    # Mejor no arrancar que guardar en un disco temporal creyendo que hay base persistente.
+    raise RuntimeError("DATABASE_URL no es una cadena PostgreSQL válida (debe empezar con postgresql://).")
 RUTA_SQLITE = os.environ.get("SIFO_DB") or os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "datos", "sifo.db")
 
@@ -65,7 +76,16 @@ def ejecutar(sql, params=(), uno=False, todos=False):
                 raise
 
 
+def descripcion():
+    """Qué base se usa, sin exponer credenciales (para el log de arranque)."""
+    if ES_PG:
+        from urllib.parse import urlparse
+        return f"PostgreSQL en {urlparse(DATABASE_URL).hostname}"
+    return f"SQLite local en {RUTA_SQLITE} (no persistente en hosting gratuito)"
+
+
 def iniciar():
+    print(f"SIFO: base de datos -> {descripcion()}", flush=True)
     if ES_PG:
         ejecutar("""CREATE TABLE IF NOT EXISTS usuarios (
             id SERIAL PRIMARY KEY,
