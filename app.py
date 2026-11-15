@@ -444,6 +444,10 @@ def analizar(lat, lon):
 
     try:
         meteo.get_forecast(lat, lon)
+        if meteo.aviso():
+            errores.append(meteo.aviso())
+        if meteo.fuente() != "Open-Meteo":
+            resultados["fuente"] = FUENTE.replace("Open-Meteo", meteo.fuente())
         t0 = meteo.hora_local_actual()
         periodos = meteo.periodos(t0)
         resultados["generado"] = t0.strftime("%d/%m/%Y %H:%M (hora local)")

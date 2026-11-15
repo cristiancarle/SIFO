@@ -11,6 +11,11 @@ URL = "https://api.open-meteo.com/v1/forecast"
 VARIABLES = ("temperature_2m,relative_humidity_2m,wind_speed_10m,"
              "wind_direction_10m,wind_gusts_10m,precipitation,cloud_cover")
 CACHE_SEG = 600
+CACHE_MAX_SEG = 6 * 3600       # último recurso si fallan las dos APIs
+URL_MET = "https://api.met.no/weatherapi/locationforecast/2.0/complete"
+# MET Norway exige un User-Agent que identifique la aplicación.
+UA = {"User-Agent": "SIFO/1.0 (+https://github.com/cristiancarle/SIFO)"}
+FACTOR_RAFAGA = 1.5            # ráfaga estimada = viento medio x factor (si la fuente no la da)
 DIR_CACHE = os.environ.get("SIFO_CACHE_DIR") or os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".cache")
 
@@ -39,20 +44,112 @@ class Meteorologia:
                 return self.datos
             except (OSError, ValueError):
                 pass
-        params = {"latitude": lat, "longitude": lon, "hourly": VARIABLES,
-                  "timezone": "auto", "forecast_days": 2}
+        errores = []
+        datos = None
         try:
-            r = requests.get(URL, params=params, timeout=20)
-            r.raise_for_status()
-            datos = r.json()
-        except (requests.RequestException, ValueError) as e:
-            raise ErrorAPI(f"No se pudo obtener el pronóstico de Open-Meteo: {e}")
-        if "hourly" not in datos:
-            raise ErrorAPI(f"Open-Meteo devolvió una respuesta inválida: {datos.get('reason', datos)}")
+            datos = self._open_meteo(lat, lon)
+        except ErrorAPI as e:
+            errores.append(str(e))
+            try:
+                datos = self._met_norway(lat, lon)
+            except ErrorAPI as e2:
+                errores.append(str(e2))
+        if datos is None:
+            viejo = self._cache_viejo(ruta)
+            if viejo is None:
+                raise ErrorAPI(" | ".join(errores))
+            viejo["_aviso"] = ("Ninguna API meteorológica respondió; se usa el último pronóstico guardado "
+                               "(menos de 6 hs de antigüedad).")
+            self.datos = viejo
+            return viejo
+        if errores and datos.get("_fuente") == "MET Norway":
+            datos["_aviso"] = ("Open-Meteo no disponible (" + errores[0][:120] + "); se usó MET Norway como "
+                               f"respaldo. Ráfagas estimadas como {FACTOR_RAFAGA}× el viento medio.")
         with open(ruta, "w", encoding="utf-8") as f:
             json.dump(datos, f)
         self.datos = datos
         return datos
+
+    @staticmethod
+    def _open_meteo(lat, lon):
+        """Open-Meteo con reintentos ante 429/5xx (IPs compartidas en hostings gratuitos)."""
+        params = {"latitude": lat, "longitude": lon, "hourly": VARIABLES,
+                  "timezone": "auto", "forecast_days": 2}
+        ultimo = None
+        for espera in (0, 2, 5):
+            if espera:
+                time.sleep(espera)
+            try:
+                r = requests.get(URL, params=params, timeout=20, headers=UA)
+                if r.status_code == 429 or r.status_code >= 500:
+                    try:
+                        motivo = r.json().get("reason", "")
+                    except ValueError:
+                        motivo = ""
+                    ultimo = f"HTTP {r.status_code} {motivo}".strip()
+                    continue
+                r.raise_for_status()
+                datos = r.json()
+            except (requests.RequestException, ValueError) as e:
+                ultimo = str(e)
+                continue
+            if "hourly" not in datos:
+                raise ErrorAPI(f"Open-Meteo devolvió una respuesta inválida: {datos.get('reason', datos)}")
+            datos["_fuente"] = "Open-Meteo"
+            return datos
+        raise ErrorAPI(f"No se pudo obtener el pronóstico de Open-Meteo: {ultimo}")
+
+    @staticmethod
+    def _met_norway(lat, lon):
+        """Respaldo: MET Norway (sin clave). Se convierte al mismo formato horario que Open-Meteo.
+        Los horarios vienen en UTC: se pasan a la zona horaria del servidor (TZ, Argentina en Docker)."""
+        try:
+            r = requests.get(URL_MET, params={"lat": round(lat, 4), "lon": round(lon, 4)},
+                             headers=UA, timeout=20)
+            r.raise_for_status()
+            serie = r.json()["properties"]["timeseries"]
+        except (requests.RequestException, ValueError, KeyError) as e:
+            raise ErrorAPI(f"No se pudo obtener el pronóstico de MET Norway: {e}")
+        off = datetime.now().astimezone().utcoffset() or timedelta(0)
+        h = {k: [] for k in ("time", "temperature_2m", "relative_humidity_2m", "wind_speed_10m",
+                             "wind_direction_10m", "wind_gusts_10m", "precipitation", "cloud_cover")}
+        anterior = None
+        for p in serie:
+            t = datetime.fromisoformat(p["time"].replace("Z", "+00:00"))
+            if anterior is not None and t - anterior != timedelta(hours=1):
+                break  # MET pasa a pasos de 6 hs más adelante: solo se usa la parte horaria
+            anterior = t
+            d = p["data"]["instant"]["details"]
+            v = d.get("wind_speed")
+            v_kmh = v * 3.6 if v is not None else None
+            g = d.get("wind_speed_of_gust")
+            h["time"].append((t + off).replace(tzinfo=None).strftime("%Y-%m-%dT%H:%M"))
+            h["temperature_2m"].append(d.get("air_temperature"))
+            h["relative_humidity_2m"].append(d.get("relative_humidity"))
+            h["wind_speed_10m"].append(v_kmh)
+            h["wind_direction_10m"].append(d.get("wind_from_direction"))
+            h["wind_gusts_10m"].append(g * 3.6 if g is not None else (v_kmh * FACTOR_RAFAGA if v_kmh is not None else None))
+            h["precipitation"].append(((p["data"].get("next_1_hours") or {}).get("details") or {}).get("precipitation_amount", 0.0))
+            h["cloud_cover"].append(d.get("cloud_area_fraction"))
+        if len(h["time"]) < 24:
+            raise ErrorAPI("MET Norway devolvió menos de 24 hs de pronóstico horario.")
+        return {"hourly": h, "utc_offset_seconds": int(off.total_seconds()), "_fuente": "MET Norway"}
+
+    @staticmethod
+    def _cache_viejo(ruta):
+        if os.path.exists(ruta) and time.time() - os.path.getmtime(ruta) < CACHE_MAX_SEG:
+            try:
+                with open(ruta, encoding="utf-8") as f:
+                    return json.load(f)
+            except (OSError, ValueError):
+                pass
+        return None
+
+    def fuente(self):
+        return (self.datos or {}).get("_fuente", "Open-Meteo")
+
+    def aviso(self):
+        return (self.datos or {}).get("_aviso", "")
 
     def hora_local_actual(self):
         """Hora local (naive, redondeada hacia abajo) del punto consultado."""
