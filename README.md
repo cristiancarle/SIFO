@@ -113,3 +113,10 @@ El sistema usa únicamente APIs gratuitas que **no requieren clave de acceso**:
 - La humedad del combustible se estima con la relación tipo BEHAVE/Simard `fm = 148.5 * (1 - exp(-0.0445 * RH))` ajustada por temperatura (ver comentarios en `modulos/combustible.py`).
 - Las carreras secundarias por quebrada aplican un factor de encauzamiento de viento de **1.3x** sobre la velocidad base (la quebrada actúa como chimenea de calor).
 - La velocidad de propagación es una referencia BEHAVE simplificada: base 0.5 km/h en pastizal seco × factor viento × factor pendiente. Es una **estimación de planificación**, no un modelo de predicción certificado.
+
+## Licencia
+
+Distribuido bajo licencia **MIT**. Ver [LICENSE](LICENSE).
+
+> SIFO es una herramienta de apoyo a la planificación. Sus estimaciones no reemplazan el criterio
+> del personal técnico ni las indicaciones del comando del incidente.
