@@ -16,6 +16,21 @@ URL_MET = "https://api.met.no/weatherapi/locationforecast/2.0/complete"
 # MET Norway exige un User-Agent que identifique la aplicación.
 UA = {"User-Agent": "SIFO/1.0 (+https://github.com/cristiancarle/SIFO)"}
 FACTOR_RAFAGA = 1.5            # ráfaga estimada = viento medio x factor (si la fuente no la da)
+
+# Si Open-Meteo avisa que se agotó el cupo diario/horario de esta IP, no tiene sentido reintentar:
+# se saltea hasta que se renueve (en memoria del proceso).
+_open_meteo_pausa_hasta = 0.0
+
+
+def _pausa_open_meteo(motivo):
+    global _open_meteo_pausa_hasta
+    ahora = datetime.now(timezone.utc)
+    m = (motivo or "").lower()
+    if "daily" in m:
+        manana = (ahora + timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
+        _open_meteo_pausa_hasta = manana.timestamp()
+    elif "hourly" in m:
+        _open_meteo_pausa_hasta = (ahora + timedelta(hours=1)).timestamp()
 DIR_CACHE = os.environ.get("SIFO_CACHE_DIR") or os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".cache")
 
@@ -63,8 +78,11 @@ class Meteorologia:
             self.datos = viejo
             return viejo
         if errores and datos.get("_fuente") == "MET Norway":
-            datos["_aviso"] = ("Open-Meteo no disponible (" + errores[0][:120] + "); se usó MET Norway como "
-                               f"respaldo. Ráfagas estimadas como {FACTOR_RAFAGA}× el viento medio.")
+            datos["_aviso"] = ("Pronóstico obtenido de MET Norway (servicio meteorológico noruego) porque "
+                               "Open-Meteo no estaba disponible. Ráfagas estimadas como "
+                               f"{FACTOR_RAFAGA}× el viento medio.")
+            app_log = errores[0]  # el detalle técnico queda en el log del servidor
+            print(f"SIFO meteo: respaldo MET Norway. Motivo: {app_log}", flush=True)
         with open(ruta, "w", encoding="utf-8") as f:
             json.dump(datos, f)
         self.datos = datos
@@ -75,6 +93,8 @@ class Meteorologia:
         """Open-Meteo con reintentos ante 429/5xx (IPs compartidas en hostings gratuitos)."""
         params = {"latitude": lat, "longitude": lon, "hourly": VARIABLES,
                   "timezone": "auto", "forecast_days": 2}
+        if time.time() < _open_meteo_pausa_hasta:
+            raise ErrorAPI("Open-Meteo sin cupo disponible desde este servidor (límite de uso gratuito).")
         ultimo = None
         for espera in (0, 2, 5):
             if espera:
@@ -87,6 +107,9 @@ class Meteorologia:
                     except ValueError:
                         motivo = ""
                     ultimo = f"HTTP {r.status_code} {motivo}".strip()
+                    if r.status_code == 429 and ("daily" in motivo.lower() or "hourly" in motivo.lower()):
+                        _pausa_open_meteo(motivo)
+                        raise ErrorAPI("Open-Meteo sin cupo disponible desde este servidor (límite de uso gratuito).")
                     continue
                 r.raise_for_status()
                 datos = r.json()
