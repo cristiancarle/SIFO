@@ -1,11 +1,9 @@
 # Blueprint de Render: https://render.com/docs/blueprint-spec
 #
-# PLAN FREE (para probar): sin disco persistente. Cada redeploy o reinicio BORRA los
-# incendios y los usuarios registrados (el admin se vuelve a crear solo al arrancar).
+# PLAN FREE: el disco del servicio es temporal, por eso usuarios e incendios se guardan en
+# una base PostgreSQL externa gratuita (Neon o Supabase) indicada en DATABASE_URL.
+# KML, informes y PDF se regeneran solos desde la base cuando faltan.
 # La app se duerme tras 15 min sin uso y tarda ~1 min en despertar.
-#
-# Para pasar a producción con datos persistentes: cambiar "plan: free" por "plan: starter"
-# y descomentar el bloque "disk".
 services:
   - type: web
     name: sifo
@@ -14,11 +12,9 @@ services:
     region: oregon
     healthCheckPath: /healthz
     autoDeploy: true
-    # disk:
-    #   name: sifo-datos
-    #   mountPath: /data
-    #   sizeGB: 1
     envVars:
+      - key: DATABASE_URL
+        sync: false          # cadena de conexión de Neon/Supabase (postgresql://...?sslmode=require)
       - key: SIFO_SECRET_KEY
         generateValue: true
       - key: SIFO_ADMIN_USUARIO

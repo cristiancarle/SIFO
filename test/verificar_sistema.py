@@ -116,9 +116,22 @@ print("Eliminación OK; quedan:", [m["nombre"] for m in app.listar_metas() if m[
 
 # Estado vacío
 import tempfile  # noqa: E402
-orig = app.DIR_SALIDA
+orig, orig_listar = app.DIR_SALIDA, app.db.listar_incendios
 app.DIR_SALIDA = tempfile.mkdtemp()
+app.db.listar_incendios = lambda: []
 for ruta in ("/", "/kml", "/informe", "/vistas"):
     assert "No hay incendios guardados. Agregá uno desde".encode() in c.get(ruta).data, ruta
-app.DIR_SALIDA = orig
+app.DIR_SALIDA, app.db.listar_incendios = orig, orig_listar
+
+# Persistencia: se borra la caché de archivos (como al reiniciar un hosting gratuito)
+# y todo debe reconstruirse desde la base de datos.
+import shutil  # noqa: E402
+shutil.rmtree(app.DIR_SALIDA)
+assert "Prueba Sierra" in c.get("/").get_data(as_text=True)
+m = app.leer_meta(base)
+for arch in (m["informe"], m["kml"], m["geojson"]):
+    assert c.get("/salida/" + arch).status_code == 200, arch
+assert c.get("/kml/%s/descargar" % base).status_code == 200
+assert c.get("/salida/foco_20990101_000000_noexiste.kml").status_code == 404
+print("Reconstrucción desde la base OK")
 print("VERIFICACIÓN COMPLETA OK")

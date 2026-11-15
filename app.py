@@ -16,6 +16,7 @@ from flask import (Flask, abort, g, redirect, render_template_string, request, s
                    session, url_for)
 from werkzeug.middleware.proxy_fix import ProxyFix
 
+from modulos import db
 from modulos import usuarios as U
 
 from modulos.combustible import Combustible
@@ -486,8 +487,7 @@ def slug(texto):
 
 
 def guardar_salidas(lat, lon, resultados, nombre="", fecha="", lugar=""):
-    """Escribe informe, KML, GeoJSON y metadatos en static/salida/; devuelve (informe, kml, base)."""
-    os.makedirs(DIR_SALIDA, exist_ok=True)
+    """Guarda el incendio en la base y genera informe, KML y GeoJSON; devuelve (informe, kml, base)."""
     ahora = datetime.now()
     base = f"{ahora.strftime('%Y%m%d_%H%M%S')}_{slug(nombre)}"
     meta = {"nombre": nombre or "Sin nombre", "fecha": fecha, "lugar": lugar, "lat": lat, "lon": lon,
@@ -495,27 +495,26 @@ def guardar_salidas(lat, lon, resultados, nombre="", fecha="", lugar=""):
     informe, kml = f"informe_{base}.html", f"foco_{base}.kml"
     meta.update({"informe": informe, "kml": kml, "geojson": f"{base}.geojson", "datos": f"{base}_datos.json"})
     resultados["meta"] = meta
-    with open(os.path.join(DIR_SALIDA, meta["datos"]), "w", encoding="utf-8") as f:
-        json.dump(resultados, f, ensure_ascii=False)
-    with open(os.path.join(DIR_SALIDA, f"{base}_meta.json"), "w", encoding="utf-8") as f:
-        json.dump(meta, f, ensure_ascii=False, indent=2)
-    regenerar(meta, "kml")
-    regenerar(meta, "informe")
+    db.guardar_incendio(meta, resultados)
+    regenerar(meta, "kml", resultados)
+    regenerar(meta, "informe", resultados)
     return informe, kml, base
 
 
 def _escribir(nombre, texto):
-    with open(os.path.join(DIR_SALIDA, nombre), "w", encoding="utf-8") as f:
+    os.makedirs(DIR_SALIDA, exist_ok=True)
+    tmp = os.path.join(DIR_SALIDA, f".{nombre}.tmp")
+    with open(tmp, "w", encoding="utf-8") as f:
         f.write(texto)
+    os.replace(tmp, os.path.join(DIR_SALIDA, nombre))  # atómico: nunca se sirve un archivo a medias
 
 
-def regenerar(meta, que):
+def regenerar(meta, que, resultados=None):
     """Regenera 'kml' (más geojson) o 'informe' desde los datos guardados. False si faltan los datos."""
-    ruta = os.path.join(DIR_SALIDA, meta.get("datos") or f"{meta['base']}_datos.json")
-    if not os.path.isfile(ruta):
-        return False
-    with open(ruta, encoding="utf-8") as f:
-        resultados = json.load(f)
+    if resultados is None:
+        resultados = db.datos_incendio(meta["base"])
+        if resultados is None:
+            return False
     resultados["meta"] = meta
     if que == "kml":
         kml_txt = generar_kml(meta["lat"], meta["lon"], resultados)
@@ -526,11 +525,23 @@ def regenerar(meta, que):
     return True
 
 
+def asegurar_archivos(meta):
+    """Los archivos de salida son una caché en disco (efímera en hostings gratuitos):
+    si faltan, se reconstruyen desde la base de datos."""
+    if not (os.path.isfile(os.path.join(DIR_SALIDA, meta["kml"]))
+            and os.path.isfile(os.path.join(DIR_SALIDA, meta["geojson"]))):
+        regenerar(meta, "kml")
+    if not os.path.isfile(os.path.join(DIR_SALIDA, meta["informe"])):
+        regenerar(meta, "informe")
+
+
 def borrar_incendio(base):
     meta = leer_meta(base)
     if meta is None:
         return False
-    nombres = {f"{base}_meta.json", f"{base}_datos.json", f"{base}.geojson"}
+    db.borrar_incendio(base)
+    nombres = {f"{base}_meta.json", f"{base}_datos.json", f"{base}.geojson",
+               meta.get("informe", "").rsplit(".", 1)[0] + ".pdf"}
     nombres |= {meta.get(k) for k in ("informe", "kml", "geojson", "datos")} - {None}
     for n in nombres:
         ruta = os.path.join(DIR_SALIDA, os.path.basename(n))
@@ -541,11 +552,8 @@ def borrar_incendio(base):
 
 def estado_datos(meta):
     """(cantidad de períodos, errores) del análisis guardado; (None, []) si faltan los datos."""
-    ruta = os.path.join(DIR_SALIDA, meta.get("datos") or f"{meta['base']}_datos.json")
-    try:
-        with open(ruta, encoding="utf-8") as f:
-            r = json.load(f)
-    except (OSError, ValueError):
+    r = db.datos_incendio(meta["base"])
+    if r is None:
         return None, []
     return len(r.get("periodos") or []), r.get("errores") or []
 
@@ -555,37 +563,43 @@ def reanalizar(meta):
     resultados = analizar(meta["lat"], meta["lon"])
     meta["generado"] = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
     resultados["meta"] = meta
-    with open(os.path.join(DIR_SALIDA, meta["datos"]), "w", encoding="utf-8") as f:
-        json.dump(resultados, f, ensure_ascii=False)
-    with open(os.path.join(DIR_SALIDA, f"{meta['base']}_meta.json"), "w", encoding="utf-8") as f:
-        json.dump(meta, f, ensure_ascii=False, indent=2)
+    db.guardar_incendio(meta, resultados)
     pdf = os.path.join(DIR_SALIDA, meta["informe"].rsplit(".", 1)[0] + ".pdf")
     if os.path.isfile(pdf):
         os.remove(pdf)  # el PDF cacheado quedó viejo
-    regenerar(meta, "kml")
-    regenerar(meta, "informe")
+    regenerar(meta, "kml", resultados)
+    regenerar(meta, "informe", resultados)
     return resultados
 
 
 def leer_meta(base):
-    if not BASE_RE.fullmatch(base):
+    if not BASE_RE.fullmatch(base or ""):
         return None
-    ruta = os.path.join(DIR_SALIDA, f"{base}_meta.json")
-    if not os.path.isfile(ruta):
-        return None
-    with open(ruta, encoding="utf-8") as f:
-        return json.load(f)
+    return db.meta_incendio(base)
 
 
 def listar_metas():
-    metas = []
+    return db.listar_incendios()
+
+
+def importar_incendios_locales():
+    """Migración: incendios guardados como archivos (versiones anteriores) pasan a la base."""
     for ruta in glob.glob(os.path.join(DIR_SALIDA, "*_meta.json")):
         try:
             with open(ruta, encoding="utf-8") as f:
-                metas.append(json.load(f))
-        except (OSError, ValueError):
+                meta = json.load(f)
+            base = meta.get("base", "")
+            if not BASE_RE.fullmatch(base) or db.existe_incendio(base):
+                continue
+            with open(os.path.join(DIR_SALIDA, meta.get("datos") or f"{base}_datos.json"), encoding="utf-8") as f:
+                datos = json.load(f)
+            db.guardar_incendio(meta, datos)
+            app.logger.info("SIFO: incendio importado a la base: %s", base)
+        except (OSError, ValueError, KeyError):
             continue
-    return sorted(metas, key=lambda m: m.get("base", ""), reverse=True)
+
+
+importar_incendios_locales()
 
 
 def pagina(plantilla, titulo, activo, **ctx):
@@ -638,6 +652,8 @@ def _seleccion(plantilla, titulo, activo, clave, regen=None):
             msg = "Archivo regenerado correctamente."
         else:
             error = "No hay datos guardados para regenerar este incendio."
+    if m:
+        asegurar_archivos(m)
     existe = bool(m) and os.path.isfile(os.path.join(DIR_SALIDA, m[clave]))
     n_periodos, errores_analisis = estado_datos(m) if m else (None, [])
     return pagina(plantilla, titulo, activo, metas=listar_metas(), m=m, existe=existe, msg=msg, error=error,
@@ -656,7 +672,10 @@ def ruta_informe():
 
 def _descarga(base, clave):
     meta = leer_meta(base)
-    if meta is None or not os.path.isfile(os.path.join(DIR_SALIDA, meta[clave])):
+    if meta is None:
+        abort(404)
+    asegurar_archivos(meta)
+    if not os.path.isfile(os.path.join(DIR_SALIDA, meta[clave])):
         abort(404)
     return send_from_directory(DIR_SALIDA, meta[clave], as_attachment=True)
 
@@ -674,6 +693,7 @@ def descargar_informe(base):
 def _generar_pdf(base, meta):
     """Convierte el informe HTML a PDF con el motor de impresión de Chromium
     (respeta el salto de página por período, logo y pies). Cachear el resultado."""
+    asegurar_archivos(meta)
     informe = meta.get("informe", "")
     html_path = os.path.join(DIR_SALIDA, informe)
     pdf_name = informe.rsplit(".", 1)[0] + ".pdf"
@@ -739,7 +759,12 @@ def ruta_reanalizar(base):
 @app.route("/salida/<path:archivo>")
 def salida(archivo):
     if not os.path.isfile(os.path.join(DIR_SALIDA, archivo)):
-        abort(404)
+        # Caché perdida (reinicio del servidor): reconstruir desde la base si es de un incendio.
+        encontrado = BASE_RE.search(archivo)
+        meta = leer_meta(encontrado.group(0).removesuffix("_datos").removesuffix("_meta")) if encontrado else None
+        if meta is None or archivo not in (meta["kml"], meta["geojson"], meta["informe"]):
+            abort(404)
+        asegurar_archivos(meta)
     return send_from_directory(DIR_SALIDA, archivo)
 
 

@@ -7,6 +7,7 @@ que acepte contenedores. Abajo están los pasos para **Render**, que ya viene co
 
 | Variable | Obligatoria | Descripción |
 |---|---|---|
+| `DATABASE_URL` | sí en hosting gratuito | PostgreSQL donde se guardan usuarios e incendios (Neon/Supabase). Sin ella se usa SQLite local. |
 | `SIFO_SECRET_KEY` | sí | Firma las cookies de sesión. Render la genera sola. |
 | `SIFO_ADMIN_USUARIO` | sí | Usuario administrador inicial. |
 | `SIFO_ADMIN_CLAVE_HASH` | sí* | Hash de la clave del admin (*o `SIFO_ADMIN_CLAVE` en texto plano). |
@@ -28,10 +29,19 @@ python3 -c "from werkzeug.security import generate_password_hash as g; print(g('
 4. Esperá el build (unos 3-5 min). La app queda en `https://sifo-xxxx.onrender.com`, con HTTPS automático.
 5. Opcional: en **Settings → Custom Domains** agregá tu dominio, por ejemplo `sifo.tudominio.com.ar`.
 
-> **Plan actual: Free (para probar).** No tiene disco persistente: cada redeploy o reinicio
-> **borra los incendios y los usuarios registrados** (el admin se vuelve a crear solo), y la app se
-> duerme tras 15 min sin uso. Para producción, en `render.yaml` cambiá `plan: free` por
-> `plan: starter` (~USD 7/mes) y descomentá el bloque `disk:`. Así los datos quedan en `/data`.
+> **Plan actual: Free + base PostgreSQL gratuita.** El disco de Render free es temporal, así que
+> los usuarios y los incendios se guardan en una base externa (`DATABASE_URL`). Los KML, informes y
+> PDF son una caché que se regenera sola desde la base cuando el servicio se reinicia.
+
+### Crear la base gratuita en Neon
+
+1. Registrate en https://neon.tech (podés usar tu cuenta de GitHub).
+2. **Create project** → nombre `sifo`, región **AWS US West 2 (Oregon)**, la misma zona que el servicio de Render.
+3. En **Connection string**, copiá la cadena que empieza con `postgresql://` (con `?sslmode=require`).
+4. En Render → servicio **sifo** → **Environment** → agregá `DATABASE_URL` con esa cadena → **Save, rebuild, and deploy**.
+
+Las tablas se crean solas al arrancar. Neon free suspende la base tras 5 min sin uso; la primera
+consulta después de eso tarda 1-2 segundos más.
 
 Cada `git push` a la rama principal redeploya la app automáticamente.
 
