@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SIFO — Sistema Inteligente para Incendios Forestales</title>
+<style>
+  body { font-family: sans-serif; background: linear-gradient(#3b1a0a, #b33a12); min-height: 100vh; margin: 0;
+         display: flex; align-items: center; justify-content: center; }
+  main { background: #fff; padding: 2em; border-radius: 12px; max-width: 480px; width: 90%;
+         box-shadow: 0 6px 24px rgba(0,0,0,.4); }
+  h1 { font-size: 1.4em; color: #8a2a0a; margin-top: 0; }
+  label { display: block; margin: .8em 0 .2em; font-weight: bold; }
+  input { width: 100%; padding: .6em; font-size: 1em; box-sizing: border-box; }
+  button { margin-top: 1.2em; width: 100%; padding: .8em; font-size: 1.1em; font-weight: bold;
+           background: #d9480f; color: #fff; border: 0; border-radius: 6px; cursor: pointer; }
+  button:disabled { background: #999; }
+  .resultado { margin-top: 1.2em; padding: 1em; background: #e6f4e6; border-radius: 6px; }
+  .error { background: #fde8e8; }
+  a { color: #8a2a0a; font-weight: bold; }
+  nav { position: fixed; top: 0; left: 0; right: 0; z-index: 2000; height: 56px; box-sizing: border-box; background: #3b1a0a;
+        padding: 0 1em; display: flex; align-items: center; gap: .3em; overflow-x: auto; box-shadow: 0 2px 8px rgba(0,0,0,.4); }
+  nav .marca { color: #ffb27a; font-weight: bold; font-size: 1.1em; margin-right: .8em; white-space: nowrap; }
+  nav a { color: #fff; padding: .5em .9em; text-decoration: none; border-radius: 6px; white-space: nowrap; }
+  nav a:hover { background: #6b2a10; }
+  nav a.activo { background: #d9480f; }
+  body { padding-top: 56px; box-sizing: border-box; }
+</style>
+</head>
+<body>
+<nav><span class="marca" title="SIFO — Sistema Inteligente para Incendios Forestales">🔥 SIFO</span><a href="/">Inicio</a><a href="/agregar" class="activo">Agregar</a><a href="/kml">KML</a><a href="/informe">Informe</a><a href="/vistas">Vistas</a></nav>
+<main>
+  <h1>Agregar incendio</h1>
+  <form method="post" action="/agregar" id="form">
+    <label for="nombre">Nombre del incendio</label>
+    <input id="nombre" name="nombre" maxlength="100" required>
+    <label for="fecha">Fecha del incidente</label>
+    <input id="fecha" name="fecha" type="date" required>
+    <label for="lugar">Lugar / localidad</label>
+    <input id="lugar" name="lugar" maxlength="150">
+    <label for="lat">Latitud</label>
+    <input id="lat" name="lat" value="-31.60" required>
+    <label for="lon">Longitud</label>
+    <input id="lon" name="lon" value="-64.45" required>
+    <button type="submit" id="btn">ANALIZAR</button>
+  </form>
+  <div id="resultado"></div>
+</main>
+<script>
+  const p = new URLSearchParams(location.search);
+  const out = document.getElementById("resultado");
+  if (p.get("lat")) document.getElementById("lat").value = p.get("lat");
+  if (p.get("lon")) document.getElementById("lon").value = p.get("lon");
+  const esc = s => s.replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+  if (p.get("error")) {
+    out.innerHTML = '<div class="resultado error">' + esc(p.get("error")) + '</div>';
+  }
+  document.getElementById("fecha").value =
+    new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+  document.getElementById("form").addEventListener("submit", () => {
+    const b = document.getElementById("btn"); b.disabled = true; b.textContent = "Analizando... (puede tardar ~10 s)";
+  });
+</script>
+</body>
+</html>

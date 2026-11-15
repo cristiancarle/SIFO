@@ -1,0 +1,34 @@
+import app OK
+errores: []
+topo: pend_max 12% prom 3% aspecto 104° cauces 8 extensión 18192 m
+base: 20261105_120950_Prueba_Sierra
+KML válido: foco_20261105_120950_Prueba_Sierra.kml | informe: informe_20261105_120950_Prueba_Sierra.html
+Expansión inmediata (0-9hs): largo 11.04 km ancho 4.42 km rumbo 220° punta a 11.04 km cauces 3 vértices 82
+Expansión >9hs: largo 6.39 km ancho 2.56 km rumbo 193° punta a 16.97 km cauces 0 vértices 82
+Expansión 24hs: largo 1.22 km ancho 0.49 km rumbo 340° punta a 16.22 km cauces 0 vértices 82
+polígonos KML: ['Expansión 24hs', 'Expansión >9hs', 'Expansión inmediata (0-9hs)']
+12:00-15:00 T24.0 RH40 V17 dir32 ráf39 fm7.5 SECO (<10%) - EXTREMO | carrera 221° 1.13 km/h | sec 5 | ventana (None, None)
+15:00-18:00 T24.9 RH33 V21 dir33 ráf42 fm6.3 SECO (<10%) - EXTREMO | carrera 221° 1.33 km/h | sec 5 | ventana (None, None)
+18:00-21:00 T21.4 RH44 V19 dir31 ráf42 fm8.2 SECO (<10%) - EXTREMO | carrera 219° 1.22 km/h | sec 5 | ventana (None, None)
+21:00-00:00 T16.7 RH64 V13 dir6 ráf31 fm11.5 BAJO (<20%) | carrera 200° 0.84 km/h | sec 5 | ventana ('21:00', '00:00')
+00:00-03:00 T14.6 RH74 V11 dir356 ráf24 fm14.2 BAJO (<20%) | carrera 192° 0.39 km/h | sec 5 | ventana ('00:00', '03:00')
+03:00-06:00 T14.4 RH71 V16 dir359 ráf31 fm13.5 BAJO (<20%) | carrera 190° 0.56 km/h | sec 5 | ventana ('03:00', '06:00')
+06:00-09:00 T15.8 RH72 V10 dir348 ráf31 fm13.6 BAJO (<20%) | carrera 185° 0.34 km/h | sec 5 | ventana ('06:00', '09:00')
+09:00-12:00 T21.5 RH58 V6 dir183 ráf27 fm10.3 BAJO (<20%) | carrera 340° 0.41 km/h | sec 5 | ventana ('09:00', '11:00')
+GeoJSON válido: 76 features, tipos ['LineString', 'Point', 'Polygon']
+GET / -> 200
+GET / -> 200
+GET / -> 200
+GET / -> 200
+GET /agregar -> 200
+GET /kml -> 200
+GET /informe -> 200
+GET /vistas -> 200
+GET /ver/20261105_120950_Prueba_Sierra -> 200
+GET /salida/20261105_120950_Prueba_Sierra.geojson -> 200
+GET /salida/foco_20261105_120950_Prueba_Sierra.kml -> 200
+GET /salida/informe_20261105_120950_Prueba_Sierra.html -> 200
+Rebranding SIFO, encabezado y pie de informe OK
+KML e informe por selección OK
+Eliminación OK; quedan: ['Prueba Sierra']
+VERIFICACIÓN COMPLETA OK

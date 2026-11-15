@@ -1,0 +1,13 @@
+{
+  "nombre": "Santa Rosa",
+  "fecha": "2026-11-05",
+  "lugar": "Santa Rosa",
+  "lat": -31.2452448,
+  "lon": -64.5914426,
+  "generado": "05/11/2026 21:46:41",
+  "base": "20261105_214641_Santa_Rosa",
+  "informe": "informe_20261105_214641_Santa_Rosa.html",
+  "kml": "foco_20261105_214641_Santa_Rosa.kml",
+  "geojson": "20261105_214641_Santa_Rosa.geojson",
+  "datos": "20261105_214641_Santa_Rosa_datos.json"
+}
