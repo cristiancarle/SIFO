@@ -45,7 +45,25 @@ def generar_kml(lat, lon, resultados):
               f"<Placemark><name>INICIO DEL FOCO</name><styleUrl>#fuego</styleUrl>"
               f"<Point><coordinates>{lon:.6f},{lat:.6f},0</coordinates></Point></Placemark>"]
 
-    for p in resultados.get("periodos", []):
+    periodos = resultados.get("periodos", [])
+    topo = resultados.get("topo")
+    notas = []
+    if not periodos:
+        notas.append("SIN DATOS METEOROLÓGICOS: no se pudieron calcular viento, carreras ni expansiones. "
+                     "Usá 'Volver a analizar' en SIFO.")
+    if topo is None:
+        notas.append("Sin análisis topográfico (falló la API de elevación): carreras calculadas solo con viento.")
+    elif periodos and not any(p["comportamiento"]["lineas_carrera_secundaria"] for p in periodos):
+        notas.append(f"Sin quebradas ni barrancos detectados (pendiente máx. {topo['pendiente_max']:.0f}%, "
+                     "terreno llano): no hay carreras secundarias.")
+    if notas:
+        partes.insert(3, f"<description>{escape(' '.join(notas))}</description>")
+        partes.append("<Folder><name>⚠ Avisos</name>" + "".join(
+            f"<Placemark><name>⚠ {escape(n.split(':')[0])}</name><description>{escape(n)}</description>"
+            f"<Point><coordinates>{lon:.6f},{lat:.6f},0</coordinates></Point></Placemark>" for n in notas)
+            + "</Folder>")
+
+    for p in periodos:
         m, c = p["meteo"], p["comportamiento"]
         etiqueta = f"+{m['inicio_h']}hs ({m['hora_inicio_str']}-{m['hora_fin_str']})"
         partes.append(f"<Folder><name>Período {escape(etiqueta)}</name>")

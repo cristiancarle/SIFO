@@ -119,15 +119,23 @@ document.querySelectorAll("button[data-base]").forEach(b => b.addEventListener("
 }));
 </script>""" + PIE
 
+AVISO_DATOS = """{% if n_periodos == 0 %}<div class="err"><b>⚠ Este incendio no tiene datos meteorológicos.</b>
+Sin meteorología no se pueden calcular viento, carreras primarias/secundarias ni expansiones.
+{% if errores_analisis %}<br><small>{{ errores_analisis|join(" · ")|truncate(300) }}</small>{% endif %}
+<form method="post" action="/incendio/{{ m.base }}/reanalizar" style="margin-top:.6em">
+<button class="btn">Volver a analizar</button></form></div>{% endif %}"""
+
 PLANTILLA_KML = CABECERA + """<h1>KML</h1>""" + SELECTOR + """
 {% if not metas %}""" + VACIO + """{% endif %}
 {% if msg %}<p class="ok">{{ msg }}</p>{% endif %}{% if error %}<p class="err">{{ error }}</p>{% endif %}
-{% if m %}<h2>{{ m.nombre }}</h2><p>{{ m.fecha }} · {{ m.lugar }}</p>
+{% if m %}<h2>{{ m.nombre }}</h2><p>{{ m.fecha }} · {{ m.lugar }}</p>""" + AVISO_DATOS + """
 <p>{% if existe %}<a class="btn" href="/kml/{{ m.base }}/descargar">Descargar KML</a>
 {% else %}<span class="aviso">El archivo KML no existe; generalo.</span>{% endif %}
 <form method="post" action="/kml" style="display:inline"><input type="hidden" name="base" value="{{ m.base }}">
 <button class="btn sec">Generar KML</button></form>
-<a class="btn sec" href="/ver/{{ m.base }}">Ver en mapa</a></p>{% endif %}""" + PIE
+<a class="btn sec" href="/ver/{{ m.base }}">Ver en mapa</a>
+<form method="post" action="/incendio/{{ m.base }}/reanalizar" style="display:inline">
+<button class="btn sec" title="Vuelve a consultar meteorología y topografía">Volver a analizar</button></form></p>{% endif %}""" + PIE
 
 PLANTILLA_INFORME = CABECERA + """<h1>Informe</h1>""" + SELECTOR + """
 {% if not metas %}""" + VACIO + """{% endif %}
@@ -156,7 +164,10 @@ PLANTILLA_VER = """<!DOCTYPE html><html lang="es"><head><meta charset="utf-8">
 <b>Coordenadas:</b> {{ "%.5f"|format(m.lat) }}, {{ "%.5f"|format(m.lon) }} &nbsp; <b>Generado:</b> {{ m.generado }}</p>
 <p><a class="btn" href="/salida/{{ m.kml }}" download>Descargar KML</a>
 <a class="btn" href="https://earth.google.com/web/" target="_blank" rel="noopener">Abrir en Google Earth</a>
-<a class="btn" href="/salida/{{ m.informe }}" target="_blank">Informe en pestaña nueva</a></p>
+<a class="btn" href="/salida/{{ m.informe }}" target="_blank">Informe en pestaña nueva</a>
+<form method="post" action="/incendio/{{ m.base }}/reanalizar" style="display:inline">
+<button class="btn sec" title="Vuelve a consultar meteorología y topografía">Volver a analizar</button></form></p>
+{% if msg %}<p class="ok">{{ msg }}</p>{% endif %}""" + AVISO_DATOS + """
 <p><small>Google Earth: descargá el KML y, en Google Earth web, usá Proyectos &rarr; Importar archivo KML.</small></p>
 <div id="map"></div>
 <h2>Informe</h2><iframe src="/salida/{{ m.informe }}" title="Informe"></iframe></div>
@@ -528,6 +539,34 @@ def borrar_incendio(base):
     return True
 
 
+def estado_datos(meta):
+    """(cantidad de períodos, errores) del análisis guardado; (None, []) si faltan los datos."""
+    ruta = os.path.join(DIR_SALIDA, meta.get("datos") or f"{meta['base']}_datos.json")
+    try:
+        with open(ruta, encoding="utf-8") as f:
+            r = json.load(f)
+    except (OSError, ValueError):
+        return None, []
+    return len(r.get("periodos") or []), r.get("errores") or []
+
+
+def reanalizar(meta):
+    """Vuelve a consultar meteorología y topografía para el mismo incendio y regenera todo."""
+    resultados = analizar(meta["lat"], meta["lon"])
+    meta["generado"] = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+    resultados["meta"] = meta
+    with open(os.path.join(DIR_SALIDA, meta["datos"]), "w", encoding="utf-8") as f:
+        json.dump(resultados, f, ensure_ascii=False)
+    with open(os.path.join(DIR_SALIDA, f"{meta['base']}_meta.json"), "w", encoding="utf-8") as f:
+        json.dump(meta, f, ensure_ascii=False, indent=2)
+    pdf = os.path.join(DIR_SALIDA, meta["informe"].rsplit(".", 1)[0] + ".pdf")
+    if os.path.isfile(pdf):
+        os.remove(pdf)  # el PDF cacheado quedó viejo
+    regenerar(meta, "kml")
+    regenerar(meta, "informe")
+    return resultados
+
+
 def leer_meta(base):
     if not BASE_RE.fullmatch(base):
         return None
@@ -600,7 +639,9 @@ def _seleccion(plantilla, titulo, activo, clave, regen=None):
         else:
             error = "No hay datos guardados para regenerar este incendio."
     existe = bool(m) and os.path.isfile(os.path.join(DIR_SALIDA, m[clave]))
-    return pagina(plantilla, titulo, activo, metas=listar_metas(), m=m, existe=existe, msg=msg, error=error)
+    n_periodos, errores_analisis = estado_datos(m) if m else (None, [])
+    return pagina(plantilla, titulo, activo, metas=listar_metas(), m=m, existe=existe, msg=msg, error=error,
+                  n_periodos=n_periodos, errores_analisis=errores_analisis)
 
 
 @app.route("/kml", methods=["GET", "POST"])
@@ -679,7 +720,20 @@ def ver(base):
     meta = leer_meta(base)
     if meta is None:
         abort(404)
-    return render_template_string(PLANTILLA_VER, m=meta, css=CSS, activo="/")
+    n_periodos, errores_analisis = estado_datos(meta)
+    return render_template_string(PLANTILLA_VER, m=meta, css=CSS, activo="/", n_periodos=n_periodos,
+                                  errores_analisis=errores_analisis, msg=request.args.get("msg", "")[:200])
+
+
+@app.route("/incendio/<base>/reanalizar", methods=["POST"])
+def ruta_reanalizar(base):
+    meta = leer_meta(base)
+    if meta is None:
+        abort(404)
+    r = reanalizar(meta)
+    msg = ("Análisis actualizado con datos nuevos." if r["periodos"]
+           else "Se volvió a analizar, pero siguen sin llegar datos meteorológicos. Probá en unos minutos.")
+    return redirect(f"/ver/{base}?" + urlencode({"msg": msg}))
 
 
 @app.route("/salida/<path:archivo>")
