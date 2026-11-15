@@ -28,10 +28,10 @@ python3 -c "from werkzeug.security import generate_password_hash as g; print(g('
 4. Esperá el build (unos 3-5 min). La app queda en `https://sifo-xxxx.onrender.com`, con HTTPS automático.
 5. Opcional: en **Settings → Custom Domains** agregá tu dominio, por ejemplo `sifo.tudominio.com.ar`.
 
-> **Datos persistentes**: `render.yaml` monta un disco en `/data` para los incendios, la caché y la
-> base de usuarios. Los discos requieren el plan **Starter** (pago). En el plan gratuito la app
-> funciona, pero cada redeploy o reinicio **borra los incendios y los usuarios registrados** (el admin
-> se vuelve a crear solo). Si querés probar gratis, quitá el bloque `disk:` y poné `plan: free`.
+> **Plan actual: Free (para probar).** No tiene disco persistente: cada redeploy o reinicio
+> **borra los incendios y los usuarios registrados** (el admin se vuelve a crear solo), y la app se
+> duerme tras 15 min sin uso. Para producción, en `render.yaml` cambiá `plan: free` por
+> `plan: starter` (~USD 7/mes) y descomentá el bloque `disk:`. Así los datos quedan en `/data`.
 
 Cada `git push` a la rama principal redeploya la app automáticamente.
 

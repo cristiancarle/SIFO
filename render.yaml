@@ -1,16 +1,23 @@
 # Blueprint de Render: https://render.com/docs/blueprint-spec
+#
+# PLAN FREE (para probar): sin disco persistente. Cada redeploy o reinicio BORRA los
+# incendios y los usuarios registrados (el admin se vuelve a crear solo al arrancar).
+# La app se duerme tras 15 min sin uso y tarda ~1 min en despertar.
+#
+# Para pasar a producción con datos persistentes: cambiar "plan: free" por "plan: starter"
+# y descomentar el bloque "disk".
 services:
   - type: web
     name: sifo
     runtime: docker
-    plan: starter            # el disco persistente requiere plan pago (starter ~USD 7/mes)
+    plan: free
     region: oregon
     healthCheckPath: /healthz
     autoDeploy: true
-    disk:
-      name: sifo-datos
-      mountPath: /data       # incendios, caché y base de usuarios sobreviven a los redeploys
-      sizeGB: 1
+    # disk:
+    #   name: sifo-datos
+    #   mountPath: /data
+    #   sizeGB: 1
     envVars:
       - key: SIFO_SECRET_KEY
         generateValue: true
