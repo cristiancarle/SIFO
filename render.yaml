@@ -1,0 +1,22 @@
+# Blueprint de Render: https://render.com/docs/blueprint-spec
+services:
+  - type: web
+    name: sifo
+    runtime: docker
+    plan: starter            # el disco persistente requiere plan pago (starter ~USD 7/mes)
+    region: oregon
+    healthCheckPath: /healthz
+    autoDeploy: true
+    disk:
+      name: sifo-datos
+      mountPath: /data       # incendios, caché y base de usuarios sobreviven a los redeploys
+      sizeGB: 1
+    envVars:
+      - key: SIFO_SECRET_KEY
+        generateValue: true
+      - key: SIFO_ADMIN_USUARIO
+        value: admin
+      - key: SIFO_ADMIN_CLAVE_HASH
+        sync: false          # Render la pide al crear el servicio; no queda en el repo
+      - key: SIFO_REGISTRO
+        value: "1"

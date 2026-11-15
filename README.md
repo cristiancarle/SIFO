@@ -17,35 +17,37 @@ La documentación operativa (cómo interpretar el informe desde el punto de vist
 
 ## Requisitos
 
-- Python 3.8 o superior
-- `flask`
-- `requests`
-- `numpy` (**opcional** — el sistema funciona sin él, con implementación en Python puro)
+- Python 3.10 o superior
+- Dependencias en `requirements.txt` (`flask`, `requests`, `numpy`, `gunicorn`)
+- Chromium (opcional, solo para exportar el informe a PDF)
 
-```bash
-pip install flask requests
-# opcional:
-pip install numpy
-```
-
-No se requiere ninguna otra dependencia.
-
-## Instalación
+## Instalación y uso local
 
 ```bash
 git clone <repo> sistema-incendios
 cd sistema-incendios
-pip install -r requirements.txt   # o instalar a mano flask y requests
-python3 -c "import app"           # verificación rápida
+python3 -m venv .venv && . .venv/bin/activate
+pip install -r requirements.txt
+
+export SIFO_ADMIN_USUARIO=admin
+export SIFO_ADMIN_CLAVE='una-clave-larga-y-segura'
+python3 app.py            # http://127.0.0.1:5000
 ```
 
-## Uso
+## Usuarios y acceso
 
-```bash
-python3 app.py
-```
+Todas las páginas requieren iniciar sesión.
 
-El servidor queda escuchando en `http://0.0.0.0:5000`. Abrir en el navegador y cargar coordenadas en el formulario.
+- **Administrador inicial**: se crea, o se actualiza, al arrancar el servidor con las variables
+  `SIFO_ADMIN_USUARIO` y `SIFO_ADMIN_CLAVE` (o `SIFO_ADMIN_CLAVE_HASH`).
+- **Registro** (`/registro`): cualquiera puede pedir una cuenta. Queda **pendiente** hasta que un
+  administrador la apruebe.
+- **Administración** (`/usuarios`, solo admins): aprobar, desactivar, eliminar y dar o quitar el rol admin.
+- **Mi cuenta** (`/cuenta`): cambiar la contraseña.
+- Seguridad: contraseñas con hash (werkzeug/scrypt), cookies `HttpOnly` + `SameSite=Lax` (`Secure` en
+  producción), verificación de origen en POST y DELETE, bloqueo de 15 min tras 5 intentos fallidos por IP.
+
+Todas las variables de configuración están en `.env.example`. Para publicar en Internet, ver **DEPLOY.md**.
 
 ### Ejemplo con coordenadas reales
 

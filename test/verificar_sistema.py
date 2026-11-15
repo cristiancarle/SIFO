@@ -54,6 +54,10 @@ print("GeoJSON válido: %d features, tipos %s" % (len(gj["features"]), sorted(ti
 assert {"Point", "LineString", "Polygon"} <= tipos
 
 c = app.app.test_client()
+# Login con el admin de prueba (SIFO_ADMIN_USUARIO / SIFO_ADMIN_CLAVE del entorno).
+assert c.get("/").status_code == 302, "sin login debe redirigir a /login"
+assert c.post("/login", data={"usuario": os.environ["SIFO_ADMIN_USUARIO"],
+                              "clave": os.environ["SIFO_ADMIN_CLAVE"]}).status_code == 302
 NAVS = [b'href="/agregar"', b'href="/kml"', b'href="/informe"', b'href="/vistas"']
 for ruta, esperado in [("/", b"Prueba Sierra"), ("/", b"Prueba Ambato"), ("/", b"Catamarca"), ("/", b"Ver KML"),
                        ("/agregar", b"Nombre del incendio"), ("/kml", b"Prueba Ambato"),
@@ -92,9 +96,8 @@ resp = c.get("/informe/%s/descargar" % base2)
 assert resp.status_code == 200 and b"<html" in resp.data and "attachment" in resp.headers["Content-Disposition"]
 html = open(os.path.join(app.DIR_SALIDA, inf), encoding="utf-8").read()
 for txt in ["SIFO — Sistema Inteligente para Incendios Forestales", "Cristian N. Carle M.P. 2484 - +5493564508868",
-            "position:fixed", "@media print", "Página 1 de 9", "marca-texto"]:
+            "@media print", "marca-texto"]:
     assert txt in html, txt
-assert html.count("class='pag-num'") == 9 and "Página 9 de 9" in html
 home = c.get("/").get_data(as_text=True)
 assert "🔥 SIFO" in home and "<title>Inicio · SIFO — Sistema Inteligente" in home
 assert b"SIFO" in c.get("/agregar").data

@@ -1,3 +1,12 @@
-build/
+.git
+.gitignore
 __pycache__/
-*.cache
+**/__pycache__/
+*.pyc
+.cache/
+datos/
+static/salida/
+.env
+build/
+test/
+verificacion.txt

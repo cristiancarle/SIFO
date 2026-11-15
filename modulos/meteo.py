@@ -11,7 +11,8 @@ URL = "https://api.open-meteo.com/v1/forecast"
 VARIABLES = ("temperature_2m,relative_humidity_2m,wind_speed_10m,"
              "wind_direction_10m,wind_gusts_10m,precipitation,cloud_cover")
 CACHE_SEG = 600
-DIR_CACHE = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".cache")
+DIR_CACHE = os.environ.get("SIFO_CACHE_DIR") or os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".cache")
 
 
 class ErrorAPI(Exception):

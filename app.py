@@ -3,13 +3,20 @@ import glob
 import json
 import os
 import re
+import secrets
 import shutil
 import subprocess
+import threading
+import time
 import unicodedata
-from datetime import date, datetime
-from urllib.parse import urlencode
+from datetime import date, datetime, timedelta
+from urllib.parse import urlencode, urlparse
 
-from flask import Flask, abort, redirect, render_template_string, request, send_from_directory
+from flask import (Flask, abort, g, redirect, render_template_string, request, send_from_directory,
+                   session, url_for)
+from werkzeug.middleware.proxy_fix import ProxyFix
+
+from modulos import usuarios as U
 
 from modulos.combustible import Combustible
 from modulos.comportamiento import ComportamientoFuego, calcular_expansiones
@@ -21,12 +28,39 @@ from modulos.topografia import Topografia
 
 BASE = os.path.dirname(os.path.abspath(__file__))
 DIR_STATIC = os.path.join(BASE, "static")
-DIR_SALIDA = os.path.join(DIR_STATIC, "salida")
+DIR_SALIDA = os.environ.get("SIFO_DATA_DIR") or os.path.join(DIR_STATIC, "salida")
 FUENTE = "Open-Meteo (meteorología) y OpenTopoData SRTM 90m (topografía)"
 
 BASE_RE = re.compile(r"\d{8}_\d{6}_[A-Za-z0-9_]+")
 
-app = Flask(__name__, static_folder=DIR_STATIC)
+# static_folder=None: nada se sirve sin pasar por el control de login.
+app = Flask(__name__, static_folder=None)
+
+# --- Configuración por variables de entorno -------------------------------
+PRODUCCION = os.environ.get("SIFO_PRODUCCION", "0") == "1"
+app.secret_key = os.environ.get("SIFO_SECRET_KEY") or secrets.token_hex(32)
+app.config.update(
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SAMESITE="Lax",
+    SESSION_COOKIE_SECURE=PRODUCCION,
+    PERMANENT_SESSION_LIFETIME=timedelta(hours=12),
+    MAX_CONTENT_LENGTH=64 * 1024,
+)
+if PRODUCCION:
+    # Detrás del proxy HTTPS del hosting (Render, Railway, Fly...).
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
+
+# Cuenta de administrador inicial (se crea/actualiza al arrancar). Los demás usuarios se registran
+# desde /registro y quedan pendientes hasta que un admin los aprueba en /usuarios.
+U.iniciar_db(os.environ.get("SIFO_ADMIN_USUARIO", ""), os.environ.get("SIFO_ADMIN_CLAVE", ""),
+             os.environ.get("SIFO_ADMIN_CLAVE_HASH", ""))
+REGISTRO_ABIERTO = os.environ.get("SIFO_REGISTRO", "1") == "1"
+
+# Freno a fuerza bruta: 5 intentos fallidos por IP -> bloqueo de 15 minutos (login y registro).
+MAX_INTENTOS, BLOQUEO_SEG = 5, 15 * 60
+_intentos = {}
+_intentos_lock = threading.Lock()
+PUBLICAS = {"login", "registro", "healthz"}
 
 CSS = """
 body{font-family:sans-serif;margin:0;padding-top:56px;background:#f4efe9;color:#222}
@@ -52,7 +86,10 @@ iframe{width:100%;height:700px;border:1px solid #999;background:#fff}
 """
 ITEMS_NAV = [("/", "Inicio"), ("/agregar", "Agregar"), ("/kml", "KML"), ("/informe", "Informe"), ("/vistas", "Vistas")]
 NAV = ('<nav><span class="marca" title="SIFO — Sistema Inteligente para Incendios Forestales">🔥 SIFO</span>' + "".join(f'<a href="{h}"{{% if activo == "{h}" %}} class="activo"{{% endif %}}>{t}</a>'
-                         for h, t in ITEMS_NAV) + '</nav>')
+                         for h, t in ITEMS_NAV) +
+       '{% if usuario_actual and usuario_actual.rol == "admin" %}<a href="/usuarios"{% if activo == "/usuarios" %} class="activo"{% endif %}>Usuarios</a>{% endif %}'
+       '<a href="/cuenta" style="margin-left:auto"{% if activo == "/cuenta" %} class="activo"{% endif %}>👤 {{ usuario_actual.usuario if usuario_actual }}</a>'
+       '<form method="post" action="/logout"><button class="btn sec">Salir</button></form></nav>')
 VACIO = '<p class="aviso">No hay incendios guardados. Agregá uno desde <a href="/agregar">AGREGAR</a>.</p>'
 CABECERA = """<!DOCTYPE html><html lang="es"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1"><title>{{ titulo }} · SIFO — Sistema Inteligente para Incendios Forestales</title>
@@ -140,6 +177,249 @@ fetch("/salida/{{ m.geojson }}").then(r => r.json()).then(gj => {
   if (capa.getBounds().isValid()) map.fitBounds(capa.getBounds());
 });
 </script></body></html>"""
+
+ESTILO_ACCESO = """body{font-family:sans-serif;background:linear-gradient(#3b1a0a,#b33a12);min-height:100vh;margin:0;
+display:flex;align-items:center;justify-content:center}main{background:#fff;padding:2em;border-radius:12px;
+max-width:400px;width:90%;box-shadow:0 6px 24px rgba(0,0,0,.4);margin:2em 0}h1{color:#8a2a0a;margin:.2em 0 0;font-size:1.6em}
+p.sub{color:#6b4a3a;margin:.2em 0 1.2em}label{display:block;margin:.8em 0 .2em;font-weight:bold}
+input{width:100%;padding:.6em;font-size:1em;box-sizing:border-box}button{margin-top:1.2em;width:100%;padding:.8em;
+font-size:1.1em;font-weight:bold;background:#d9480f;color:#fff;border:0;border-radius:6px;cursor:pointer}
+.err{padding:.8em;background:#fde8e8;border-radius:6px;margin-top:1em}.ok{padding:.8em;background:#e6f4e6;border-radius:6px;margin-top:1em}
+.alt{text-align:center;margin-top:1.2em}a{color:#8a2a0a;font-weight:bold}small{color:#6b4a3a}"""
+
+PLANTILLA_LOGIN = """<!DOCTYPE html><html lang="es"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1"><title>Ingresar · SIFO</title>
+<style>{{ estilo }}</style></head><body><main>
+<h1>🔥 SIFO</h1><p class="sub">Sistema Inteligente para Incendios Forestales</p>
+{% if msg %}<p class="ok">{{ msg }}</p>{% endif %}
+<form method="post"><input type="hidden" name="siguiente" value="{{ siguiente }}">
+<label for="u">Usuario</label><input id="u" name="usuario" autocomplete="username" required autofocus>
+<label for="c">Contraseña</label><input id="c" name="clave" type="password" autocomplete="current-password" required>
+<button>Ingresar</button></form>{% if error %}<p class="err">{{ error }}</p>{% endif %}
+{% if registro %}<p class="alt">¿No tenés cuenta? <a href="/registro">Registrate</a></p>{% endif %}</main></body></html>"""
+
+PLANTILLA_REGISTRO = """<!DOCTYPE html><html lang="es"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1"><title>Registro · SIFO</title>
+<style>{{ estilo }}</style></head><body><main>
+<h1>🔥 SIFO</h1><p class="sub">Solicitud de cuenta</p>
+{% if errores %}<div class="err">{% for e in errores %}<div>{{ e }}</div>{% endfor %}</div>{% endif %}
+<form method="post">
+<label for="n">Nombre y apellido</label><input id="n" name="nombre" value="{{ f.nombre }}" maxlength="100" required autofocus>
+<label for="e">Email</label><input id="e" name="email" type="email" value="{{ f.email }}" maxlength="150" required>
+<label for="u">Usuario</label><input id="u" name="usuario" value="{{ f.usuario }}" autocomplete="username"
+ pattern="[A-Za-z0-9_.\\-]{3,30}" required>
+<label for="c">Contraseña <small>(mínimo {{ minimo }} caracteres)</small></label>
+<input id="c" name="clave" type="password" minlength="{{ minimo }}" autocomplete="new-password" required>
+<label for="c2">Repetir contraseña</label>
+<input id="c2" name="clave2" type="password" minlength="{{ minimo }}" autocomplete="new-password" required>
+<button>Solicitar cuenta</button></form>
+<p class="alt"><small>Tu cuenta quedará pendiente hasta que un administrador la apruebe.</small><br><br>
+¿Ya tenés cuenta? <a href="/login">Ingresá</a></p></main></body></html>"""
+
+
+def _ip():
+    return request.remote_addr or "?"
+
+
+def _bloqueado(clave):
+    with _intentos_lock:
+        n, desde = _intentos.get(clave, (0, 0))
+        if n >= MAX_INTENTOS and time.time() - desde < BLOQUEO_SEG:
+            return True
+        if n >= MAX_INTENTOS:
+            _intentos.pop(clave, None)
+        return False
+
+
+def _sumar_intento(clave):
+    with _intentos_lock:
+        n, desde = _intentos.get(clave, (0, time.time()))
+        _intentos[clave] = (n + 1, time.time() if n + 1 >= MAX_INTENTOS else desde)
+
+
+def _siguiente_seguro(url):
+    """Solo rutas internas (evita open redirect)."""
+    p = urlparse(url or "")
+    return url if url and not p.scheme and not p.netloc and url.startswith("/") and not url.startswith("//") else "/"
+
+
+def _mismo_origen():
+    """Defensa CSRF extra (además de SameSite=Lax): los POST/DELETE deben venir de este mismo sitio."""
+    origen = request.headers.get("Origin")
+    if origen and urlparse(origen).netloc != request.host:
+        abort(403)
+
+
+@app.before_request
+def control_acceso():
+    g.usuario = None
+    if request.method not in ("GET", "HEAD", "OPTIONS"):
+        _mismo_origen()
+    uid = session.get("uid")
+    if uid:
+        u = U.obtener(uid)
+        if u is not None and u["estado"] == "activo":
+            g.usuario = u
+        else:
+            session.clear()  # desactivado o eliminado: se cierra su sesión
+    if request.endpoint in PUBLICAS or g.usuario is not None:
+        return None
+    if request.method == "GET":
+        return redirect(url_for("login", siguiente=request.full_path.rstrip("?")))
+    abort(401)
+
+
+def solo_admin():
+    if g.usuario is None or g.usuario["rol"] != "admin":
+        abort(403)
+
+
+@app.context_processor
+def contexto_usuario():
+    return {"usuario_actual": g.get("usuario")}
+
+
+@app.after_request
+def cabeceras_seguridad(resp):
+    resp.headers.setdefault("X-Content-Type-Options", "nosniff")
+    resp.headers.setdefault("X-Frame-Options", "SAMEORIGIN")
+    resp.headers.setdefault("Referrer-Policy", "same-origin")
+    if PRODUCCION:
+        resp.headers.setdefault("Strict-Transport-Security", "max-age=31536000")
+    return resp
+
+
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    if g.usuario is not None:
+        return redirect("/")
+    siguiente = _siguiente_seguro(request.values.get("siguiente", "/"))
+    error, codigo = "", 200
+    if request.method == "POST":
+        ip = "login:" + _ip()
+        if _bloqueado(ip):
+            error, codigo = "Demasiados intentos fallidos. Probá de nuevo en 15 minutos.", 429
+        else:
+            u, motivo = U.autenticar(request.form.get("usuario", "").strip(), request.form.get("clave", ""))
+            if u is not None:
+                with _intentos_lock:
+                    _intentos.pop(ip, None)
+                session.clear()
+                session.permanent = True
+                session["uid"] = u["id"]
+                return redirect(siguiente)
+            codigo = 401
+            if motivo == "pendiente":
+                error = "Tu cuenta todavía no fue aprobada por un administrador."
+            elif motivo == "inactivo":
+                error = "Tu cuenta está desactivada. Contactá a un administrador."
+            else:
+                _sumar_intento(ip)
+                app.logger.warning("SIFO: login fallido desde %s", _ip())
+                error = "Usuario o contraseña incorrectos."
+    return render_template_string(PLANTILLA_LOGIN, estilo=ESTILO_ACCESO, siguiente=siguiente, error=error,
+                                  msg=request.args.get("msg", "")[:200], registro=REGISTRO_ABIERTO), codigo
+
+
+@app.route("/registro", methods=["GET", "POST"])
+def registro():
+    if not REGISTRO_ABIERTO:
+        abort(404)
+    f = {k: request.form.get(k, "").strip() for k in ("usuario", "nombre", "email")}
+    errores = []
+    if request.method == "POST":
+        ip = "registro:" + _ip()
+        if _bloqueado(ip):
+            errores = ["Demasiadas solicitudes desde tu conexión. Probá de nuevo más tarde."]
+        else:
+            errores = U.validar_registro(f["usuario"], f["nombre"], f["email"],
+                                         request.form.get("clave", ""), request.form.get("clave2", ""))
+            if not errores:
+                _sumar_intento(ip)  # máx. 5 registros por IP cada 15 min
+                if U.registrar(f["usuario"], f["nombre"], f["email"], request.form["clave"]):
+                    app.logger.info("SIFO: nuevo registro pendiente: %s", f["usuario"])
+                    return redirect(url_for("login", msg="Solicitud enviada. Vas a poder ingresar cuando un "
+                                                          "administrador apruebe tu cuenta."))
+                errores = ["Ese nombre de usuario ya está en uso."]
+    return render_template_string(PLANTILLA_REGISTRO, estilo=ESTILO_ACCESO, errores=errores, f=f,
+                                  minimo=U.CLAVE_MIN), (400 if errores else 200)
+
+
+@app.route("/logout", methods=["POST"])
+def logout():
+    session.clear()
+    return redirect(url_for("login"))
+
+
+@app.route("/healthz")
+def healthz():
+    return {"ok": True}
+
+
+PLANTILLA_USUARIOS = CABECERA + """<h1>Usuarios</h1>
+{% if msg %}<p class="ok">{{ msg }}</p>{% endif %}{% if error %}<p class="err">{{ error }}</p>{% endif %}
+<table><tr><th>Usuario</th><th>Nombre</th><th>Email</th><th>Rol</th><th>Estado</th><th>Registro</th><th>Último ingreso</th><th>Acciones</th></tr>
+{% for u in lista %}<tr><td>{{ u.usuario }}</td><td>{{ u.nombre }}</td><td>{{ u.email }}</td><td>{{ u.rol }}</td>
+<td>{% if u.estado == "pendiente" %}<b style="color:#a61e1e">pendiente</b>{% else %}{{ u.estado }}{% endif %}</td>
+<td>{{ u.creado }}</td><td>{{ u.ultimo_login or "—" }}</td><td>
+{% if u.id != usuario_actual.id %}<form method="post" style="display:inline"><input type="hidden" name="uid" value="{{ u.id }}">
+{% if u.estado != "activo" %}<button class="btn" name="accion" value="aprobar">{{ "Aprobar" if u.estado == "pendiente" else "Activar" }}</button>
+{% else %}<button class="btn sec" name="accion" value="desactivar">Desactivar</button>{% endif %}
+{% if u.rol == "admin" %}<button class="btn sec" name="accion" value="quitar_admin">Quitar admin</button>
+{% else %}<button class="btn sec" name="accion" value="hacer_admin">Hacer admin</button>{% endif %}
+<button class="btn peligro" name="accion" value="eliminar" onclick="return confirm('¿Eliminar al usuario {{ u.usuario }}?')">Eliminar</button>
+</form>{% else %}<small>(vos)</small>{% endif %}</td></tr>{% endfor %}</table>""" + PIE
+
+PLANTILLA_CUENTA = CABECERA + """<h1>Mi cuenta</h1>
+<p><b>Usuario:</b> {{ usuario_actual.usuario }} &nbsp; <b>Nombre:</b> {{ usuario_actual.nombre }} &nbsp;
+<b>Email:</b> {{ usuario_actual.email or "—" }} &nbsp; <b>Rol:</b> {{ usuario_actual.rol }}</p>
+<h2>Cambiar contraseña</h2>
+{% if msg %}<p class="ok">{{ msg }}</p>{% endif %}{% if error %}<p class="err">{{ error }}</p>{% endif %}
+<form method="post" style="max-width:400px">
+<p><label>Contraseña actual<br><input name="actual" type="password" autocomplete="current-password" required style="width:100%;padding:.5em"></label></p>
+<p><label>Contraseña nueva (mín. {{ minimo }})<br><input name="nueva" type="password" minlength="{{ minimo }}" autocomplete="new-password" required style="width:100%;padding:.5em"></label></p>
+<button class="btn">Guardar</button></form>""" + PIE
+
+
+@app.route("/usuarios", methods=["GET", "POST"])
+def admin_usuarios():
+    solo_admin()
+    msg = error = ""
+    if request.method == "POST":
+        try:
+            uid = int(request.form.get("uid", ""))
+        except ValueError:
+            abort(400)
+        u, accion = U.obtener(uid), request.form.get("accion", "")
+        if u is None:
+            abort(404)
+        if uid == g.usuario["id"]:
+            error = "No podés modificar tu propia cuenta desde acá."
+        elif (accion in ("desactivar", "quitar_admin", "eliminar") and u["rol"] == "admin"
+              and u["estado"] == "activo" and U.cantidad_admins_activos() <= 1):
+            error = "Debe quedar al menos un administrador activo."
+        elif accion == "aprobar":
+            U.cambiar_estado(uid, "activo"); msg = f"Usuario {u['usuario']} activado."
+        elif accion == "desactivar":
+            U.cambiar_estado(uid, "inactivo"); msg = f"Usuario {u['usuario']} desactivado."
+        elif accion == "hacer_admin":
+            U.cambiar_rol(uid, "admin"); msg = f"{u['usuario']} ahora es administrador."
+        elif accion == "quitar_admin":
+            U.cambiar_rol(uid, "usuario"); msg = f"{u['usuario']} ya no es administrador."
+        elif accion == "eliminar":
+            U.eliminar(uid); msg = f"Usuario {u['usuario']} eliminado."
+        else:
+            abort(400)
+    return pagina(PLANTILLA_USUARIOS, "Usuarios", "/usuarios", lista=U.listar(), msg=msg, error=error)
+
+
+@app.route("/cuenta", methods=["GET", "POST"])
+def cuenta():
+    msg = error = ""
+    if request.method == "POST":
+        error = U.cambiar_clave(g.usuario["id"], request.form.get("actual", ""), request.form.get("nueva", ""))
+        msg = "" if error else "Contraseña actualizada."
+    return pagina(PLANTILLA_CUENTA, "Mi cuenta", "/cuenta", msg=msg, error=error, minimo=U.CLAVE_MIN)
 
 
 def analizar(lat, lon):
@@ -405,4 +685,5 @@ def salida(archivo):
 
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000)
+    # Solo para desarrollo local; en producción se usa gunicorn (ver Dockerfile).
+    app.run(host=os.environ.get("HOST", "127.0.0.1"), port=int(os.environ.get("PORT", "5000")))
