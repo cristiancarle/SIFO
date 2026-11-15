@@ -283,7 +283,8 @@ def contexto_usuario():
 def cabeceras_seguridad(resp):
     resp.headers.setdefault("X-Content-Type-Options", "nosniff")
     resp.headers.setdefault("X-Frame-Options", "SAMEORIGIN")
-    resp.headers.setdefault("Referrer-Policy", "same-origin")
+    # OSM exige Referer con el origen para servir los mosaicos del mapa.
+    resp.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
     if PRODUCCION:
         resp.headers.setdefault("Strict-Transport-Security", "max-age=31536000")
     return resp
